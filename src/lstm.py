@@ -39,10 +39,12 @@ class LSTM(object):
         self.Why = nd.random_normal(shape=(self.num_hidden, self.num_outputs), ctx=ctx) * .01
         self.by = nd.random_normal(shape=self.num_outputs, ctx=ctx) * .01
 
+        self.params = [self.Wxg, self.Wxi, self.Wxf, self.Wxo, self.Whg, self.Whi, self.Whf, self.Who, self.bg, self.bi, self.bf, self.bo, self.Why, self.by]
+
     def lstm_rnn(self,inputs, h, c, temperature=1.0):
         outputs = []
         for X in inputs:
-            g = nd.tanh(nd.dot(X, self.Whg)+nd.dot(h,self.Whg)+self.bg)
+            g = nd.tanh(nd.dot(X, self.Wxg)+nd.dot(h,self.Whg)+self.bg)
             i = nd.sigmoid(nd.dot(X,self.Wxi)+nd.dot(h,self.Whi)+self.bi)
             f = nd.sigmoid(nd.dot(X,self.Wxf)+nd.dot(h,self.Whf)+self.bf)
             o = nd.sigmoid(nd.dot(X,self.Wxo)+nd.dot(h,self.Who)+self.bo)
