@@ -40,10 +40,14 @@ class LSTM(object):
         self.by = nd.random_normal(shape=self.num_outputs, ctx=ctx) * .01
 
         self.params = [self.Wxg, self.Wxi, self.Wxf, self.Wxo, self.Whg, self.Whi, self.Whf, self.Who, self.bg, self.bi, self.bf, self.bo, self.Why, self.by]
-
-    def lstm_rnn(self,inputs, h, c, temperature=1.0):
+        for param in self.params:
+            param.attach_grad()
+    def lstm_rnn(self,inputs,h,c,temperature=1.0):
         outputs = []
         for X in inputs:
+            # if not X.shape[0] == 77:
+            #     continue
+            #print("X.shape",X.shape,self.Wxg.shape)
             g = nd.tanh(nd.dot(X, self.Wxg)+nd.dot(h,self.Whg)+self.bg)
             i = nd.sigmoid(nd.dot(X,self.Wxi)+nd.dot(h,self.Whi)+self.bi)
             f = nd.sigmoid(nd.dot(X,self.Wxf)+nd.dot(h,self.Whf)+self.bf)
@@ -53,7 +57,8 @@ class LSTM(object):
             h = o*nd.tan(c)
 
             yhat_linear = nd.dot(h,self.Why) + self.by
-            yhat = self.softmax(yhat_linear,temperature=temperature)
+            #yhat = self.softmax(yhat_linear,temperature=temperature)
+            yhat = mx.ndarray.softmax(yhat_linear,temperature=temperature)
             outputs.append(yhat)
         return (outputs,h,c)
     def softmax(self,y_linear,temperature=1.0):
@@ -66,12 +71,13 @@ class LSTM(object):
         return - nd.mean(nd.sum(y*nd.log(yhat),axis=0,exclude=True))
 
     def average_ce_loss(self,outputs,labels):
-        assert (len(outputs) == len (labels))
+        #print(len(outputs),len(labels))
+        assert (len(outputs) == len(labels))
         total_loss = 0.
         for (output,label) in zip(outputs,labels):
             total_loss = total_loss + self.cross_entropy(output,label)
         return total_loss / len(outputs)
 
-    def SGD(self,params,lr):
-        for param in params:
+    def SGD(self,lr):
+        for param in self.params:
             param[:] = param - lr*param.grad
