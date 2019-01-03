@@ -1,0 +1,20 @@
+r = open(path,'rb')
+print (len(r.read()))
+#imgBuf = StringIO.StringIO(r.read())  # 采用StringIO直接将验证码文件写到内存，省去写入硬盘
+img = Image.open(r)
+
+
+try:
+    for orientation in ExifTags.TAGS.keys() :
+        if ExifTags.TAGS[orientation]=='Orientation' : break
+    exif=dict(img._getexif().items())
+    if   exif[orientation] == 3 :
+        img=img.rotate(180, expand = True)
+    elif exif[orientation] == 6 :
+        img=img.rotate(270, expand = True)
+    elif exif[orientation] == 8 :
+        img=img.rotate(90, expand = True)
+except:
+    pass
+
+img.save("test1.jpg",format='JPEG')
