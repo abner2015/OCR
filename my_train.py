@@ -3,7 +3,7 @@ import mxnet as mx
 from mxnet import nd, autograd
 import numpy as np
 from mxboard import SummaryWriter
-
+import data.dataset2
 mx.random.seed(1)
 from src.lstm import LSTM
 from dataset.data import get_data
@@ -40,9 +40,11 @@ def main(lstm,train_data,train_label):
         h = nd.zeros(shape=(batch_size,num_hidden))
         c = nd.zeros(shape=(batch_size,num_hidden))
         num_batches =2
-        for i in range(num_batches):
-            data_one_hot = train_data[i]
-            label_one_hot = train_label[i]
+        dataset = ""
+        for X, Y in dataset2.data_iter_random(my_seq, batch_size=2, num_steps=6):
+
+            data_one_hot = X
+            label_one_hot = Y
             data_one_hot.attach_grad()
             label_one_hot.attach_grad()
             with autograd.record():
