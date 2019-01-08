@@ -5,9 +5,9 @@ import numpy as np
 
 class LSTM(object):
     def __init__(self,vocab_size,ctx):
-        self.num_inputs = vocab_size
+        self.num_inputs = 60
         self.num_hidden = 256
-        self.num_outputs = vocab_size
+        self.num_outputs = 60
 
         ########################
         #  Weights connecting the inputs to the hidden layer
@@ -47,7 +47,7 @@ class LSTM(object):
         for X in inputs:
             # if not X.shape[0] == 77:
             #     continue
-            #print("X.shape",X.shape,self.Wxg.shape)
+            print("X.shape",X.shape,self.Wxg.shape,self.Whg.shape,h.shape)
             g = nd.tanh(nd.dot(X, self.Wxg)+nd.dot(h,self.Whg)+self.bg)
             i = nd.sigmoid(nd.dot(X,self.Wxi)+nd.dot(h,self.Whi)+self.bi)
             f = nd.sigmoid(nd.dot(X,self.Wxf)+nd.dot(h,self.Whf)+self.bf)
