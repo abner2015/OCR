@@ -3,14 +3,15 @@ import mxnet as mx
 from mxnet import nd, autograd
 import numpy as np
 from mxboard import SummaryWriter
-import data.dataset2
+import dataset.dataset2 as dset
 mx.random.seed(1)
 from src.lstm import LSTM
 from dataset.data import get_data
 num_hidden = 256
 with open("data/timemachine.txt") as f:
     time_machine = f.read()
-time_machine = time_machine[:-38000]
+my_seq = list(range(30))
+#time_machine = time_machine[:-38000]
 character_list = list(set(time_machine))
 vocab_size = len(character_list)
 character_dict = {}
@@ -41,7 +42,7 @@ def main(lstm,train_data,train_label):
         c = nd.zeros(shape=(batch_size,num_hidden))
         num_batches =2
         dataset = ""
-        for X, Y in dataset2.data_iter_random(my_seq, batch_size=2, num_steps=6):
+        for X, Y in dset.data_iter_random(my_seq, batch_size=2, num_steps=6):
 
             data_one_hot = X
             label_one_hot = Y
@@ -58,7 +59,7 @@ def main(lstm,train_data,train_label):
             lstm.SGD(learning_rate)
             if learning_rate % 20 == 0:
                 learning_rate = learning_rate * 0.1
-            if ( i == 0 ) and (e == 0):
+            if e == 0:
                 moving_loss = nd.mean(loss).asscalar()
             else:
                 moving_loss = .99*moving_loss + .01*nd.mean(loss).asscalar()
