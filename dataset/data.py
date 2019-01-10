@@ -2,9 +2,9 @@ from mxnet import nd
 #data set process
 import mxnet as mx
 ctx = mx.cpu(0)
-with open("../data/train.txt") as f:
+with open("./data/train.txt") as f:
     time_machine = f.read()
-#time_machine = time_machine[:-38000]
+time_machine = time_machine[:-38000]
 print (time_machine)
 character_list = list(set(time_machine))
 vocab_size = len(character_list)
@@ -28,13 +28,14 @@ def textify(embedding):
         result += character_list[int(idx)]
     return result
 def get_data():
-    batch_size = 32
-    seq_length = 64
+    batch_size = 30
+    seq_length = 29
     # -1 here so we have enough characters for labels later
     num_samples = (len(time_numerical) - 1) // seq_length
     print(time_numerical[:seq_length * num_samples])
     dataset = one_hots(time_numerical[:seq_length * num_samples]).reshape((num_samples, seq_length, vocab_size))
     num_batches = len(dataset) // batch_size
+    print("num_batches : {0} {1}".format(num_batches,len(dataset)))
     train_data = dataset[:num_batches * batch_size].reshape((num_batches, batch_size, seq_length, vocab_size))
     #print(train_data)
     # swap batch_size and seq_length axis to make later access easier
