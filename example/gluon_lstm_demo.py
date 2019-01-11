@@ -34,7 +34,7 @@ def train_and_predict_rnn_gluon(model, num_hiddens, vocab_size, ctx,
         # data_iter = data_iter_consecutive(
         #     corpus_indices, batch_size, num_steps, ctx)
         state = model.begin_state(batch_size=batch_size, ctx=ctx)
-
+        model.hybridize()
         for X, Y in data_iter:
             for s in state:
                 s.detach()
@@ -45,7 +45,7 @@ def train_and_predict_rnn_gluon(model, num_hiddens, vocab_size, ctx,
                 y = Y.T.reshape((-1,))
                 #l = loss(output, y)
                 # y = nd.one_hot(y,60)
-
+                model.forward(X,state)
                 output = nd.expand_dims(output,axis=1)
                 y = nd.expand_dims(y, axis=1)
                 #print(output.shape, y.shape)
@@ -66,8 +66,9 @@ def train_and_predict_rnn_gluon(model, num_hiddens, vocab_size, ctx,
                 print(' -', predict_rnn_gluon(
                     prefix, pred_len, model, vocab_size, ctx, idx_to_char,
                     char_to_idx))
-    model.save_params("model_lstm.params")
+    #model.save_params("model_lstm.params")
 
+    model.export("gluon")
 def predict_rnn_gluon(prefix, num_chars, model, vocab_size, ctx, idx_to_char,
                       char_to_idx):
     """Precit next chars with a Gluon RNN model"""
@@ -108,13 +109,14 @@ class RNNModel(gluon.HybridBlock):
             self.vocab_size = vocab_size
             self.dense = nn.Dense(vocab_size)
 
-    def forward(self, inputs,state,  *args, **kwargs) :
+    def forward(self,inputs,state,  *args, **kwargs) :
         X = nd.one_hot(inputs.T, self.vocab_size)
         # print("db",type(self.rnn))
         Y,state = self.rnn(X, state)
         #print("dd",Y,type(Y))
         output = self.dense(Y.reshape((-1, Y.shape[-1])))
-        return output, state
+
+        return  output, state
 
 
     def begin_state(self, *args, **kwargs):
@@ -141,8 +143,8 @@ if __name__ == "__main__":
 
     model = RNNModel(lstm_layer,vocab_size=vocab_size)
 
-
     train_and_predict_rnn_gluon(model, num_hiddens, vocab_size, ctx,
                                 corpus_indices, idx_to_char, char_to_idx,
                                 num_epochs, num_steps, lr, clipping_theta,
                                 batch_size, pred_period, pred_len, prefixes)
+    model.export('gluon11')
