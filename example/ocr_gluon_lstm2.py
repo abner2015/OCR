@@ -91,7 +91,9 @@ if __name__ == "__main__":
     # #export the model
     # # net.save_params()
     # lstm.export("mod1")
-    net = gluon.nn.SymbolBlock.imports('mod1-symbol.json', ['data0'], param_file='mod1-0000.params',   ctx=mx.cpu())
+    net = gluon.nn.SymbolBlock.imports('mod1-symbol.json', ['data0,data1'],    ctx=mx.cpu())
+    # net.load_parameters(lstm.begin_state())
+    net.load_parameters("mod1-0000.params")
     output = net(data)
     output = output[0].reshape((-1, output.shape[-1]))
     print (output.shape )
