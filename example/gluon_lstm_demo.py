@@ -45,7 +45,7 @@ def train_and_predict_rnn_gluon(model, num_hiddens, vocab_size, ctx,
                 y = Y.T.reshape((-1,))
                 #l = loss(output, y)
                 # y = nd.one_hot(y,60)
-                model.forward(X,state)
+                #model.forward(X,state)
                 output = nd.expand_dims(output,axis=1)
                 y = nd.expand_dims(y, axis=1)
                 #print(output.shape, y.shape)
