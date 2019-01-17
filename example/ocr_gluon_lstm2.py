@@ -17,8 +17,11 @@ class OCRLSTM(nn.HybridBlock):
         print("cnn",type(X))
         X = X.squeeze(axis=1)
         #print(X.shape)
-        X = X.transpose((0,2,1))
-        print("transpose",type(X))
+        X = X.transpose((1,2,0))
+        print("infer",self.infer_shape(X))
+        for x in F.array(X):
+            print("dtest : ",x)
+        print("transpose",len(X))
         #print(X.shape,state.shape)
         X,state = self.rnn(X,state)
         print("type",type(state))
@@ -76,7 +79,7 @@ if __name__ == "__main__":
     #print(net)
     lstm.initialize()
     lstm.hybridize()
-    print(lstm)
+    #print(lstm)
     loss = gluon.loss.CTCLoss(layout='NTC', label_layout='NT')
     trainer = gluon.Trainer(lstm.collect_params(),'sgd',{'learning_rate':0.001})
     state = lstm.begin_state(batch_size=1)
@@ -110,7 +113,7 @@ if __name__ == "__main__":
             print('train_loss %.4f'%(train_loss))
             # print('output max', output.argmax(axis=2))
 
-        print(" result ",predict(lstm,data,state))
+        #print(" result ",predict(lstm,data,state))
     #export the model
 
     lstm.export("mod1")
