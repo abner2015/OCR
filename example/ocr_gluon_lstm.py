@@ -42,7 +42,7 @@ class OCRLSTM(nn.Block):
     def begin_state(self, *args, **kwargs):
         return self.rnn.begin_state(*args, **kwargs)
 # -1 is background
-char_dict = {0:'0',1:'1',2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',-1:'-1'}
+char_dict = {0:'0',1:'1',2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'-1'}
 vocab_size = len(char_dict)
 char2id = []
 X = nd.array([[6],[0],[8],[1]])
@@ -158,16 +158,19 @@ if __name__ == "__main__":
         op,state = lstm(data,state)
         print('outpuddd', op.shape)
         print('outpuddd', op)
-        # op = nd.reshape(op,(176,11))
-        # #print("dddtest ",test)
-        # print('op',op.shape)
-        # print(op[0].asnumpy())
-        # #op = op[0].asnumpy()
-        # tt = mx.nd.softmax(op)
-        # print ("op tt ",tt.asnumpy())
-        # rec = ctc_label((op.argmax( axis=1)))
-        # print(rec)
-        # prediction = [p - 1 for p in rec]
+        op = nd.reshape(op,(176,11))
+        #print("dddtest ",test)
+        print('op',op.shape)
+        print(op[0].asnumpy())
+        #op = op[0].asnumpy()
+        tt = mx.nd.softmax(op)
+        tt2 = tt.asnumpy().argmax(axis=1)
+        print ("op tt ",tt.asnumpy().argmax( axis=1))
+        print("length :",len(tt.asnumpy().argmax( axis=1)))
+        tag = [ d for d in tt2]
+        #rec = ctc_label(tt.asnumpy().argmax( axis=1))
+        print("tag : ",tag)
+        #prediction = [p - 1 for p in rec]
         # print("prediction : ",prediction)
 
     #export the model
