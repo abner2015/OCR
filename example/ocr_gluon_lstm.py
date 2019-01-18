@@ -33,10 +33,10 @@ class OCRLSTM(nn.Block):
         #X = X.reshape((-1, X.shape[-1]))
         X = mx.nd.concat(*output,dim=0)
         print("concat shape ",X.shape)
-        #X = self.fc(X)
+        X = self.fc(X)
         #X = self.fc(X.reshape((-1, self.num_hidden)))
         print("fc", X.shape)
-        print(mx.sym.Reshape(data=X, shape=(-4,11, -1, 0)))
+
         return X,state
 
     def begin_state(self, *args, **kwargs):
@@ -68,6 +68,31 @@ def ctc_label(p):
             continue
         ret.append(c2)
     return ret
+def to_ctc_format(label,seq_length):
+    #seq_length = 176
+    str = label
+    str_list = [x for x in str]
+    #print('str_list',str_list)
+    index = 0
+    length = (len(str_list))
+    label_list = []
+    # add -1 at repeat num ,such as : 00-->0-*-0
+    while index < length:
+        #print (index)
+        if index + 1 < length and str_list[index] == str_list[index+1] :
+            label_list.append(str_list[index])
+            label_list.append(-1)
+        else:
+            label_list.append(str_list[index])
+        index = index + 1
+    #print(label_list)
+    if len(label_list) < seq_length:
+        le = seq_length - len(label_list)
+        other = [-1]*le
+        print("other ",other)
+        label_list.extend(other)
+    #print (label_list)
+    return label_list
 if __name__ == "__main__":
     from mxboard import SummaryWriter
 
@@ -84,10 +109,12 @@ if __name__ == "__main__":
     data = nd.transpose(data.reshape(1,50,180,3),(0,3,1,2))
     print("after data shape :",data.shape)
     #ch2id = nd.array([[0,0,0],[0],[8],[1]])
-    label = nd.array([[6],[0],[8],[1]])
-    label = label.transpose((1,0))
-    label = [nd.one_hot(x, vocab_size) for x in label.T]
-    label = nd.array(label[0])
+    label_str = '6081'
+    label_list = to_ctc_format(label_str,176)
+    label = nd.array([label_list])
+    # label = label.transpose((1,0))
+    # label = [nd.one_hot(x, vocab_size) for x in label.T]
+    # label = nd.array(label[0])
     net = nn.HybridSequential()
     lstm = OCRLSTM()
     lstm.collect_params().initialize(mx.init.Xavier(),ctx = mx.cpu())
@@ -123,24 +150,25 @@ if __name__ == "__main__":
         global_step = global_step + 1
         # if epoch == 1 :
         #     sw.add_graph(net)
-        trainer.step(1)
+        trainer.step(1,ignore_stale_grad=True)
         net.save_parameters("mo1.params")
         if(epoch %100 == 0):
             print('train_loss %.4f'%(train_loss))
             # print('output max', output.argmax(axis=2))
         op,state = lstm(data,state)
         print('outpuddd', op.shape)
-        op = nd.reshape(op,(176,4))
-        #print("dddtest ",test)
-        print('op',op.shape)
-        print(op[0].asnumpy())
-        #op = op[0].asnumpy()
-        tt = mx.nd.softmax(op)
-        print ("op tt ",tt.asnumpy())
-        rec = ctc_label((op.argmax( axis=1)))
-        print(rec)
-        prediction = [p - 1 for p in rec]
-        print("prediction : ",prediction)
+        print('outpuddd', op)
+        # op = nd.reshape(op,(176,11))
+        # #print("dddtest ",test)
+        # print('op',op.shape)
+        # print(op[0].asnumpy())
+        # #op = op[0].asnumpy()
+        # tt = mx.nd.softmax(op)
+        # print ("op tt ",tt.asnumpy())
+        # rec = ctc_label((op.argmax( axis=1)))
+        # print(rec)
+        # prediction = [p - 1 for p in rec]
+        # print("prediction : ",prediction)
 
     #export the model
     net.save_params("test")
