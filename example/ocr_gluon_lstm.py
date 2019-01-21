@@ -8,6 +8,7 @@ class OCRLSTM(nn.Block):
         with self.name_scope():
             self.cnn = nn.Conv2D(channels=1,kernel_size=3,layout="NCHW")
             self.polling = nn.AvgPool2D(pool_size=(3,3),strides=1)
+            self.act = nn.Activation(activation='relu')
             self.rnn = gluon.rnn.LSTM(hidden_size=hidden_size,num_layers=num_layers,layout="NTC")
             self.fc = nn.Dense(vocab_size,in_units=hidden_size,flatten=False)
             #self.state = self.rnn.begin_state(batch_size=22)
@@ -16,6 +17,7 @@ class OCRLSTM(nn.Block):
         # input shape 1*3*36*248 (batch_size, in_channels, height, width)`
         X = self.cnn(inputs)
         X = self.polling(X)
+        X = self.act(X)
         #X = X.squeeze(axis=1)
         print("cnn",X.shape)
         #X = X.resize((1,1,9,62))
@@ -42,13 +44,14 @@ class OCRLSTM(nn.Block):
     def begin_state(self, *args, **kwargs):
         return self.rnn.begin_state(*args, **kwargs)
 # -1 is background
-char_dict = {0:'0',1:'1',2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'-1'}
+char_dict = {0:'0',1:'1',2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',-1:'_'}
+id2char = [0,1,2,3,4,5,6,7,8,9,'_']
 vocab_size = len(char_dict)
 char2id = []
-X = nd.array([[6],[0],[8],[1]])
-a =[nd.one_hot(x, vocab_size) for x in X.T]
-a = nd.array(a[0])
-print("aaaa ",a,)
+# X = nd.array([[6],[0],[8],[1]])
+# a =[nd.one_hot(x, vocab_size) for x in X.T]
+# a = nd.array(a[0])
+# print("aaaa ",a,)
 def ctc_label(p):
     """
     Iterates through p, identifying non-zero and non-repeating values, and returns them in a list
@@ -69,6 +72,12 @@ def ctc_label(p):
         ret.append(c2)
     return ret
 def to_ctc_format(label,seq_length):
+    """
+
+    :param label: str "0123"
+    :param seq_length: equal the time_step
+    :return: [0,1,2,3,-1,-1,...]
+    """
     #seq_length = 176
     str = label
     str_list = [x for x in str]
@@ -80,10 +89,10 @@ def to_ctc_format(label,seq_length):
     while index < length:
         #print (index)
         if index + 1 < length and str_list[index] == str_list[index+1] :
-            label_list.append(str_list[index])
+            label_list.append(int(str_list[index]))
             label_list.append(-1)
         else:
-            label_list.append(str_list[index])
+            label_list.append(int(str_list[index]))
         index = index + 1
     #print(label_list)
     if len(label_list) < seq_length:
@@ -93,6 +102,26 @@ def to_ctc_format(label,seq_length):
         label_list.extend(other)
     #print (label_list)
     return label_list
+def data_iter(img_path,label_str):
+    """
+
+    :return: data ,label
+    """
+    data = mx.image.imread(img_path)
+    data = data.astype('float32') / 255.0
+    data = data - 0.5
+    print("data shape ", data.shape)
+    data = data.reshape(1, 128, 60, 3)
+    print("data shape ", data.shape)
+    data = nd.transpose(data, (0, 3, 1, 2))
+
+    print("after data shape :", data.shape)
+    # ch2id = nd.array([[0,0,0],[0],[8],[1]])
+    #label_str = '0681'
+    label_list = to_ctc_format(label_str, 56)
+    print("label_list",label_list)
+    label = nd.array([label_list])
+    return data,label
 if __name__ == "__main__":
     from mxboard import SummaryWriter
 
@@ -100,35 +129,15 @@ if __name__ == "__main__":
 
     from mxnet import autograd, gluon, image, init, nd
     import mxnet as mx
-    data = mx.image.imread("../data/bo681.jpg")
-    data = data.astype('float32')/255.0
-    data = data-0.5
-    print("data shape ",data.shape)
-    data = data.reshape(1,50, 180, 3)
-    print("data shape ", data.shape)
-    data = nd.transpose(data.reshape(1,50,180,3),(0,3,1,2))
-    print("after data shape :",data.shape)
-    #ch2id = nd.array([[0,0,0],[0],[8],[1]])
-    label_str = '6081'
-    label_list = to_ctc_format(label_str,176)
-    label = nd.array([label_list])
-    # label = label.transpose((1,0))
-    # label = [nd.one_hot(x, vocab_size) for x in label.T]
-    # label = nd.array(label[0])
-    net = nn.HybridSequential()
+    data,label = data_iter()
+
     lstm = OCRLSTM()
     lstm.collect_params().initialize(mx.init.Xavier(),ctx = mx.cpu())
 
-    # with net.name_scope():
-    #     net.add(lstm)
-    # net.initialize()
-    # net.hybridize()
-    #print(net)
     loss = gluon.loss.CTCLoss(layout='NTC', label_layout='NT')
     trainer = gluon.Trainer(lstm.collect_params(),'sgd',{'learning_rate':0.001})
     state = lstm.begin_state(batch_size=1)
     global_step = 0
-
 
     for epoch in range(100):
         train_loss = .0
@@ -151,17 +160,17 @@ if __name__ == "__main__":
         # if epoch == 1 :
         #     sw.add_graph(net)
         trainer.step(1,ignore_stale_grad=True)
-        net.save_parameters("mo1.params")
+
         if(epoch %100 == 0):
             print('train_loss %.4f'%(train_loss))
             # print('output max', output.argmax(axis=2))
         op,state = lstm(data,state)
         print('outpuddd', op.shape)
-        print('outpuddd', op)
-        op = nd.reshape(op,(176,11))
+        #print('outpuddd', op)
+        op = nd.reshape(op,(56,11))
         #print("dddtest ",test)
-        print('op',op.shape)
-        print(op[0].asnumpy())
+        #print('op',op.shape)
+        #print(op[0].asnumpy())
         #op = op[0].asnumpy()
         tt = mx.nd.softmax(op)
         tt2 = tt.asnumpy().argmax(axis=1)
@@ -169,7 +178,12 @@ if __name__ == "__main__":
         print("length :",len(tt.asnumpy().argmax( axis=1)))
         tag = [ d for d in tt2]
         #rec = ctc_label(tt.asnumpy().argmax( axis=1))
-        print("tag : ",tag)
+        #print("tag : ",tag)
+        str_num = ''
+        for i in tag:
+            #if i in char_dict.keys():
+            str_num = str_num + " "+str(id2char[i])
+        print("result ",str_num)
         #prediction = [p - 1 for p in rec]
         # print("prediction : ",prediction)
 
