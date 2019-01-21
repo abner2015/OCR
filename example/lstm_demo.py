@@ -2,7 +2,7 @@
 refector thr lstm function
 
 """
-from mxnet import nd
+
 import mxnet as mx
 import math
 import time
@@ -10,7 +10,7 @@ from dataset.dataset2 import data_iter_random
 from mxnet.gluon import data as gdata, loss as gloss, nn, utils as gutils
 from mxnet import autograd, gluon, image, init, nd
 import zipfile
-import numpy as np
+
 from mxnet.gluon import rnn
 ctx = mx.cpu()
 
@@ -26,11 +26,7 @@ def load_data_jay_lyrics():
     vocab_size = len(char_to_idx)
     corpus_indices = [char_to_idx[char] for char in corpus_chars]
     return corpus_indices, char_to_idx, idx_to_char, vocab_size
-# (corpus_indices, char_to_idx, idx_to_char,
-#      vocab_size) = load_data_jay_lyrics()
-# print(corpus_indices)
-#print(char_to_idx)
-#vocab_size = 60
+
 my_seq = list(range(60))
 time_machine = my_seq
 character_list = list(set(time_machine))
@@ -178,13 +174,24 @@ def predict_rnn(prefix, num_chars, rnn, params, init_rnn_state,
 
 if __name__ == "__main__":
     #vocab_size = 60
+    import numpy as np
 
-    num_epochs, num_steps, batch_size, lr, clipping_theta = 2000, 5, 2, 1e2, 1e-2
-    pred_period, pred_len, prefixes = 8, 5, ['9', '20']
-    lstm_layer = rnn.LSTM(256)
 
-    train_and_predict_rnn(lstm,get_params, init_lstm_state, num_hiddens,
-                          vocab_size, ctx, corpus_indices, idx_to_char,
-                          char_to_idx, False, num_epochs, num_steps, lr,
-                          clipping_theta, batch_size, pred_period, pred_len,
-                          prefixes)
+    loss = gluon.loss.CTCLoss()
+    print(mx.nd.ones((2, 4)))
+    a = mx.nd.ones((2, 4))
+    b = nd.expand_dims(a,axis=0)
+    print("b ",b,b.shape)
+    print(mx.nd.array([[1, 0, -1, -1], [2, 1, 1, -1]]).shape)
+    l = loss(mx.nd.ones((2, 30, 4)), mx.nd.array([[1, 0, -1, -1], [2, 1, 1, -1]]))
+    #mx.test_utils.assert_almost_equal(l.asnumpy(), np.array([18.82820702, 16.50581741]))
+    print(l)
+    # num_epochs, num_steps, batch_size, lr, clipping_theta = 2000, 5, 2, 1e2, 1e-2
+    # pred_period, pred_len, prefixes = 8, 5, ['9', '20']
+    # lstm_layer = rnn.LSTM(256)
+    #
+    # train_and_predict_rnn(lstm,get_params, init_lstm_state, num_hiddens,
+    #                       vocab_size, ctx, corpus_indices, idx_to_char,
+    #                       char_to_idx, False, num_epochs, num_steps, lr,
+    #                       clipping_theta, batch_size, pred_period, pred_len,
+    #                       prefixes)
