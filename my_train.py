@@ -3,18 +3,29 @@ import mxnet as mx
 from mxnet import nd, autograd
 import numpy as np
 from mxboard import SummaryWriter
+<<<<<<< HEAD
+import dataset.dataset2 as dset
+=======
 import dataset.dataset2 as ds
+>>>>>>> 072f755e8341e37d10e23312696909a820334461
 mx.random.seed(1)
 from src.lstm_old import LSTM
 import numpy as np
 from dataset.data import get_data
 num_hidden = 256
+<<<<<<< HEAD
+with open("data/timemachine.txt") as f:
+    time_machine = f.read()
+my_seq = list(range(30))
+#time_machine = time_machine[:-38000]
+=======
 # with open("data/timemachine.txt") as f:
 #     time_machine = f.read()
 my_seq = list(range(60))
 print("my_seq ",my_seq)
 #time_machine = time_machine[:-38000]
 time_machine = my_seq
+>>>>>>> 072f755e8341e37d10e23312696909a820334461
 character_list = list(set(time_machine))
 vocab_size = len(character_list)
 character_dict = {}
@@ -45,11 +56,15 @@ def main(lstm,train_data,train_label):
         c = nd.zeros(shape=(batch_size,num_hidden))
         num_batches =2
         dataset = ""
+<<<<<<< HEAD
+        for X, Y in dset.data_iter_random(my_seq, batch_size=2, num_steps=6):
+=======
         for X, Y in ds.data_iter_random(my_seq, batch_size=5, num_steps=5):
             #print("orgil",X)
             #b = X.reshape((num_batches, batch_size, seq_length, vocab_size))
             #X = nd.one_hot(X, vocab_size)
             X = X.T
+>>>>>>> 072f755e8341e37d10e23312696909a820334461
 
             #print(X)
             #Y = nd.one_hot(Y, vocab_size)
@@ -76,7 +91,11 @@ def main(lstm,train_data,train_label):
             lstm.SGD(learning_rate)
             if learning_rate % 200 == 0:
                 learning_rate = learning_rate * 0.1
+<<<<<<< HEAD
+            if e == 0:
+=======
             if  (e == 0):
+>>>>>>> 072f755e8341e37d10e23312696909a820334461
                 moving_loss = nd.mean(loss).asscalar()
             else:
                 moving_loss = .99*moving_loss + .01*nd.mean(loss).asscalar()

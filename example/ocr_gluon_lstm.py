@@ -105,9 +105,7 @@ def to_ctc_format(label,seq_length):
 def data_iter(img_path,label_str):
     """
 
-    :param img_path:  1.jpg
-    :param label_str: 2345
-    :return: data,label
+    :return: data ,label
     """
     data = mx.image.imread(img_path)
     data = data.astype('float32') / 255.0
@@ -123,77 +121,80 @@ def data_iter(img_path,label_str):
     label_list = to_ctc_format(label_str, 56)
     print("label_list",label_list)
     label = nd.array([label_list])
+    return data,
 
-    return data,label
-if __name__ == "__main__":
-
-    from mxboard import SummaryWriter
-    sw = SummaryWriter(logdir='./logs', flush_secs=5)
-
-    from mxnet import autograd, gluon, image, init, nd
-    import mxnet as mx
-    img_path = ".././data/bo681.jpg"
-    label_str = '0681'
-    data,label = data_iter(img_path,label_str)
-
+def train():
     lstm = OCRLSTM()
-    lstm.collect_params().initialize(mx.init.Xavier(),ctx = mx.cpu())
+    lstm.collect_params().initialize(mx.init.Xavier(), ctx=mx.cpu())
 
     loss = gluon.loss.CTCLoss(layout='NTC', label_layout='NT')
-    trainer = gluon.Trainer(lstm.collect_params(),'sgd',{'learning_rate':0.001})
+    trainer = gluon.Trainer(lstm.collect_params(), 'sgd', {'learning_rate': 0.001})
     state = lstm.begin_state(batch_size=1)
     global_step = 0
 
     for epoch in range(100):
         train_loss = .0
         with autograd.record():
-            #print("data ",state)
-            output,state = lstm(data,state)
+            # print("data ",state)
+            output, state = lstm(data, state)
             # s = net.tojson()
             # print(s)
             # net.export("model10")
-            #output = nd.expand_dims(output, axis=1)
+            # output = nd.expand_dims(output, axis=1)
             output = output.transpose((1, 0, 2))
-            #label = nd.expand_dims(label, axis=1)
-            #label = label.reshape((1,4))
-            print("output ",output.shape,label.shape)
-            L = loss(output,label)
+            # label = nd.expand_dims(label, axis=1)
+            # label = label.reshape((1,4))
+            print("output ", output.shape, label.shape)
+            L = loss(output, label)
         L.backward()
         train_loss = nd.mean(L).asscalar()
-        #sw.add_scalar(tag="loss",value=train_loss,global_step=global_step)
+        # sw.add_scalar(tag="loss",value=train_loss,global_step=global_step)
         global_step = global_step + 1
         # if epoch == 1 :
         #     sw.add_graph(net)
-        trainer.step(1,ignore_stale_grad=True)
+        trainer.step(1, ignore_stale_grad=True)
 
-        if(epoch %100 == 0):
-            print('train_loss %.4f'%(train_loss))
+        if (epoch % 100 == 0):
+            print('train_loss %.4f' % (train_loss))
             # print('output max', output.argmax(axis=2))
-        op,state = lstm(data,state)
+        op, state = lstm(data, state)
         print('outpuddd', op.shape)
-        #print('outpuddd', op)
-        op = nd.reshape(op,(56,11))
-        #print("dddtest ",test)
-        #print('op',op.shape)
-        #print(op[0].asnumpy())
-        #op = op[0].asnumpy()
+        # print('outpuddd', op)
+        op = nd.reshape(op, (56, 11))
+        # print("dddtest ",test)
+        # print('op',op.shape)
+        # print(op[0].asnumpy())
+        # op = op[0].asnumpy()
         tt = mx.nd.softmax(op)
         tt2 = tt.asnumpy().argmax(axis=1)
-        print ("op tt ",tt.asnumpy().argmax( axis=1))
-        print("length :",len(tt.asnumpy().argmax( axis=1)))
-        tag = [ d for d in tt2]
-        #rec = ctc_label(tt.asnumpy().argmax( axis=1))
-        #print("tag : ",tag)
+        print ("op tt ", tt.asnumpy().argmax(axis=1))
+        print("length :", len(tt.asnumpy().argmax(axis=1)))
+        tag = [d for d in tt2]
+        # rec = ctc_label(tt.asnumpy().argmax( axis=1))
+        # print("tag : ",tag)
         str_num = ''
         for i in tag:
-            #if i in char_dict.keys():
-            str_num = str_num + " "+str(id2char[i])
-        print("result ",str_num)
+            # if i in char_dict.keys():
+            str_num = str_num + " " + str(id2char[i])
+        print("result ", str_num)
+if __name__ == "__main__":
+    from mxboard import SummaryWriter
+
+    sw = SummaryWriter(logdir='./logs', flush_secs=5)
+
+    from mxnet import autograd, gluon, image, init, nd
+    import mxnet as mx
+
+    img_path = "../data/bo681.jpg"
+    label_str = "0681"
+    data,label = data_iter(img_path,label_str)
+
+
         #prediction = [p - 1 for p in rec]
         # print("prediction : ",prediction)
 
     #export the model
-    net.save_params("test")
+
     #net.export("mod1")
     # net = gluon.nn.SymbolBlock.imports('mod1-symbol.json', ['data'], param_file='mod1-0000.params',   ctx=mx.cpu())
     # output = net(data)
@@ -201,4 +202,5 @@ if __name__ == "__main__":
     # print (output.shape )
     # print(output.argmax(axis=1))
     # print(len(output.argmax(axis=1)))
+
 
