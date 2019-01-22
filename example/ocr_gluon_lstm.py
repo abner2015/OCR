@@ -105,7 +105,9 @@ def to_ctc_format(label,seq_length):
 def data_iter(img_path,label_str):
     """
 
-    :return: data ,label
+    :param img_path:  1.jpg
+    :param label_str: 2345
+    :return: data,label
     """
     data = mx.image.imread(img_path)
     data = data.astype('float32') / 255.0
@@ -121,15 +123,18 @@ def data_iter(img_path,label_str):
     label_list = to_ctc_format(label_str, 56)
     print("label_list",label_list)
     label = nd.array([label_list])
+
     return data,label
 if __name__ == "__main__":
-    from mxboard import SummaryWriter
 
+    from mxboard import SummaryWriter
     sw = SummaryWriter(logdir='./logs', flush_secs=5)
 
     from mxnet import autograd, gluon, image, init, nd
     import mxnet as mx
-    data,label = data_iter()
+    img_path = ".././data/bo681.jpg"
+    label_str = '0681'
+    data,label = data_iter(img_path,label_str)
 
     lstm = OCRLSTM()
     lstm.collect_params().initialize(mx.init.Xavier(),ctx = mx.cpu())
