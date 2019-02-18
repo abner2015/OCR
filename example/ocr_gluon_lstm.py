@@ -42,7 +42,7 @@ class OCRLSTM(nn.Block):
     def begin_state(self, *args, **kwargs):
         return self.rnn.begin_state(*args, **kwargs)
 # -1 is background
-char_dict = {0:'0',1:'1',2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',-1:'10'}
+char_dict = {'0':'0','1':'1','2':'2','3':'3','4':'4','5':'5','6':'6','7':'7','8':'8','9':'9','-1':'10','d':'11','+':'12'}
 id2char = [0,1,2,3,4,5,6,7,8,9,'_']
 vocab_size = len(char_dict)
 char2id = []
@@ -76,7 +76,7 @@ def to_ctc_format(label,seq_length):
     #seq_length = 176
     str = label
     str_list = [x for x in str]
-    #print('str_list',str_list)
+    print('str_list',str_list)
     index = 0
     length = (len(str_list))
     label_list = []
@@ -84,10 +84,10 @@ def to_ctc_format(label,seq_length):
     while index < length:
         #print (index)
         if index + 1 < length and str_list[index] == str_list[index+1] :
-            label_list.append(int(str_list[index]))
+            label_list.append(int(char_dict[str_list[index]]))
             label_list.append(-1)
         else:
-            label_list.append(int(str_list[index]))
+            label_list.append(int(char_dict[str_list[index]]))
         index = index + 1
     #print(label_list)
     if len(label_list) < seq_length:
@@ -95,7 +95,7 @@ def to_ctc_format(label,seq_length):
         other = [-1]*le
         # print("other ",other)
         label_list.extend(other)
-    #print (label_list)
+    print (label_list)
     return label_list
 def data_iter(img_path):
     """
@@ -103,7 +103,7 @@ def data_iter(img_path):
     """
     for root,dir,files in os.walk(img_path):
         for file in files:
-            print("img ",file)
+            # print("img ",file)
             assert os.path.exists(root+file)," file not exists {}".format(root+file)
             data = mx.image.imread(root+file)
             data = data.astype('float32') / 255.0
@@ -114,6 +114,8 @@ def data_iter(img_path):
             data = nd.transpose(data, (0, 3, 1, 2))
             #get the label from the file
             label_str = file.split("=")[-1].replace(".jpg","")
+            label_str = label_str.replace(".","")
+            label_str = label_str.replace("+", "")
             # print("after data shape :", data.shape)
             label_list = to_ctc_format(label_str, 56)
             # print("label_list",label_list)
@@ -123,8 +125,8 @@ def data_iter(img_path):
 
             d = nd.one_hot(label,11)
             d = nd.reshape(d,shape=(11,56))
-            print("d  ",d)
-            print("d  ", d.shape)
+            # print("d  ",d)
+            # print("d  ", d.shape)
             yield data,label
 
 def train(data_iter):
@@ -192,7 +194,7 @@ if __name__ == "__main__":
     from mxnet import autograd, gluon, image, init, nd
     import mxnet as mx
 
-    img_path = "../data/train/"
+    img_path = "/home/abner/dnn/project/tf/Attention-OCR/data/cut1/"
 
     data = data_iter(img_path)
     data_ite = []
