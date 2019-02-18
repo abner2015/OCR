@@ -163,6 +163,7 @@ def train(data_iter):
                 print('train_loss %.4f' % (train_loss))
                 # print('output max', output.argmax(axis=2))
             predict(data,state)
+import numpy
 
 def predict(data,state):
     lstm = OCRLSTM()
