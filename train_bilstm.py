@@ -1,10 +1,5 @@
 
-import numpy as np
-import random
-from skimage import transform as skimage_tf
-from skimage import exposure
-import json
-import multiprocessing
+
 import os
 import random
 import string
@@ -17,8 +12,11 @@ from mxnet import nd, autograd, gluon
 from mxnet.gluon.model_zoo.vision import resnet34_v1
 import numpy as np
 from skimage import transform as skimage_tf
-from skimage import exposure
+from skimage import exposure,io
+
 from tqdm import tqdm
+from src.cnn_bilstm import CNNBiLSTM
+
 np.seterr(all='raise')
 alphabet_encoding = r' !"#&\'()*+,-./0123456789:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 alphabet_dict = {alphabet_encoding[i]:i for i in range(len(alphabet_encoding))}
@@ -30,7 +28,7 @@ ctx = mx.gpu() if mx.context.num_gpus() > 0 else mx.cpu()
 
 epochs = 120
 learning_rate = 0.0001
-batch_size = 32
+batch_size = 2
 
 max_seq_len = 160
 print_every_n = 5
@@ -49,8 +47,9 @@ def transform(image, label):
     Furthermore, the label (text) is one-hot encoded.
     '''
     image = np.expand_dims(image, axis=0).astype(np.float32)
-    if image[0, 0, 0] > 1:
-        image = imag e /255.
+    print("image ",type(image))
+    if (image[0, 0, 0] > 1).all():
+        image = image /255.
     image = (image - 0.942532484060557) / 0.15926149044640417
     label_encoded = np.zeros(max_seq_len, dtype=np.float32 ) -1
     i = 0
@@ -61,6 +60,7 @@ def transform(image, label):
         for letter in word:
             label_encoded[i] = alphabet_dict[letter]
             i += 1
+    print(type(image))
     return image, label_encoded
 
 def augment_transform(image, label):
@@ -70,7 +70,6 @@ def augment_transform(image, label):
         - scales the image by y_scaling and x_scaling (percentage)
         - shears the image by shearing_factor (radians)
     '''
-
     ty = random.uniform(-random_y_translation, random_y_translation)
     tx = random.uniform(-random_x_translation, random_x_translation)
 
@@ -86,8 +85,26 @@ def augment_transform(image, label):
                                     translation=(tx *image.shape[1], ty *image.shape[0]))
     augmented_image = skimage_tf.warp(image, st, cval=1.0)
 
-    return transform(augmented_imag e *255., label)
+    return transform(augmented_image *255., label)
 
+
+import cv2
+import numpy as np
+
+
+def draw_text_on_image(images, text):
+    output_image_shape = (images.shape[0], images.shape[1], images.shape[2] * 2,
+                          images.shape[3])  # Double the output_image_shape to print the text in the bottom
+
+    output_images = np.zeros(shape=output_image_shape)
+    for i in range(images.shape[0]):
+        white_image_shape = (images.shape[2], images.shape[3])
+        white_image = np.ones(shape=white_image_shape) * 1.0
+        text_image = cv2.putText(white_image, text[i], org=(5, 30), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1,
+                                 color=0.0, thickness=1)
+        output_images[i, :, :images.shape[2], :] = images[i]
+        output_images[i, :, images.shape[2]:, :] = text_image
+    return output_images
 
 def decode(prediction):
     '''
@@ -113,7 +130,6 @@ def run_epoch(e, network, dataloader, trainer, log_dir, print_name, is_train):
     for i, (x, y) in enumerate(dataloader):
         x = x.as_in_context(ctx)
         y = y.as_in_context(ctx)
-
         with autograd.record(train_mode=is_train):
             output = network(x)
             loss_ctc = ctc_loss(output, y)
@@ -130,18 +146,56 @@ def run_epoch(e, network, dataloader, trainer, log_dir, print_name, is_train):
             output_image[output_image > 1] = 1
             print("{} first decoded text = {}".format(print_name, decoded_text[0]))
             with SummaryWriter(logdir=log_dir, verbose=False, flush_secs=5) as sw:
-                sw.add_image('bb_{}_image'.format(print_name), output_image, global_step=e)
+                sw.add_image('bb_{}_image'.format(print_name),output_image,global_step=e)
 
         total_loss += loss_ctc.mean()
-
+    # print(total_loss.asscalar())
+    # print(len(dataloader))
     epoch_loss = float(total_loss.asscalar())/len(dataloader)
 
     with SummaryWriter(logdir=log_dir, verbose=False, flush_secs=5) as sw:
         sw.add_scalar('loss', {print_name: epoch_loss}, global_step=e)
 
     return epoch_loss
+from mxnet.gluon.data import dataset
+import cv2
+class OCRDataset(dataset.Dataset):
+    def __init__(self,root):
+        self.root = root
+        self._data = []
+        self._label = []
 
+        for root1,dir,files in os.walk(self.root):
+            for file in files:
+                image_path = root1+file
+                #image = cv2.imread(image_path)
+                image = io.imread(image_path)
+                #image = mx.image.imread(image_path)
+                label = file.split("=")[-1].replace(".jpg", "")
+                self._data.append(image)
+                self._label.append(label)
+
+    def __getitem__(self, idx):
+        return (self._data[idx], self._label[idx])
+    def __len__(self):
+        return len(self._data)
 if __name__ == '__main__':
+    log_dir = "E:/project/OCR/logs/handwriting_recognition"
+    checkpoint_dir = "model_checkpoint"
+    checkpoint_name = "handwriting.params"
+    train_path = "E:/project/OCR/data/train/"
+    test_path = "E:/project/OCR/data/train/"
+    ###
+    train_ds = OCRDataset(train_path)
+    print("Number of training samples: {}".format(len(train_ds)))
+
+    test_ds = OCRDataset(train_path)
+    print("Number of testing samples: {}".format(len(test_ds)))
+    train_data = gluon.data.DataLoader(train_ds.transform(augment_transform), batch_size, shuffle=True,
+                                       last_batch="rollover", num_workers=0)
+    test_data = gluon.data.DataLoader(test_ds.transform(transform), batch_size, shuffle=True, last_batch="keep",num_workers=1)  # , num_workers=multiprocessing.cpu_count()-2)
+
+    ###
     net = CNNBiLSTM(num_downsamples=num_downsamples, resnet_layer_id=resnet_layer_id,
                     rnn_hidden_states=lstm_hidden_states, rnn_layers=lstm_layers, max_seq_len=max_seq_len, ctx=ctx)
     net.hybridize()
