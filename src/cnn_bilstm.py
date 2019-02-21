@@ -18,7 +18,7 @@ class CNNBiLSTM(gluon.HybridBlock):
 
     '''
     FEATURE_EXTRACTOR_FILTER = 64
-    def __init__(self,num_downsamples=2,resnet_layer_id = 4,rnn_hidden_states=200,rnn_layer=1,max_seq_len=100,ctx=mx.gpu(0),**kwargs):
+    def __init__(self,num_downsamples=2,resnet_layer_id = 4,rnn_hidden_states=200,rnn_layers=1,max_seq_len=100,ctx=mx.gpu(0),**kwargs):
         super(CNNBiLSTM,self).__init__(**kwargs)
         self.p_dropout = 0.5
         self.num_downsamples = num_downsamples
@@ -29,7 +29,7 @@ class CNNBiLSTM(gluon.HybridBlock):
             self.encoders = gluon.nn.HybridSequential()
             with self.encoders.name_scope():
                 for i in range(self.num_downsamples):
-                    encoder = self.getencoder(rnn_hidden_state=rnn_hidden_states,rnn_layers=rnn_layers,max_seq_len=max_seq_len)
+                    encoder = self.get_encoder(rnn_hidden_states=rnn_hidden_states,rnn_layers=rnn_layers,max_seq_len=max_seq_len)
                     self.encoders.add(encoder)
                 self.decoder = self.get_decoder()
                 self.downsampler = self.get_down_sampler(self.FEATURE_EXTRACTOR_FILTER)
@@ -50,7 +50,7 @@ class CNNBiLSTM(gluon.HybridBlock):
                 out.add(gluon.nn.BatchNorm(in_channels=num_filters))
                 out.add(gluon.nn.Activation('relu'))
             out.add(gluon.nn.MaxPool2D(2))
-            out.collect_params().initalize(mx.init.Normal(),ctx = self.ctx)
+            out.collect_params().initialize(mx.init.Normal(),ctx = self.ctx)
         out.hybridize()
         return out
 
