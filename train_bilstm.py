@@ -18,6 +18,7 @@ from mxnet.gluon.model_zoo.vision import resnet34_v1
 import numpy as np
 from skimage import transform as skimage_tf
 from skimage import exposure
+from src.cnn_bilstm import CNNBiLSTM
 from tqdm import tqdm
 np.seterr(all='raise')
 alphabet_encoding = r' !"#&\'()*+,-./0123456789:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
@@ -50,7 +51,7 @@ def transform(image, label):
     '''
     image = np.expand_dims(image, axis=0).astype(np.float32)
     if image[0, 0, 0] > 1:
-        image = imag e /255.
+        image = image /255.
     image = (image - 0.942532484060557) / 0.15926149044640417
     label_encoded = np.zeros(max_seq_len, dtype=np.float32 ) -1
     i = 0
@@ -86,7 +87,7 @@ def augment_transform(image, label):
                                     translation=(tx *image.shape[1], ty *image.shape[0]))
     augmented_image = skimage_tf.warp(image, st, cval=1.0)
 
-    return transform(augmented_imag e *255., label)
+    return transform(augmented_image *255., label)
 
 
 def decode(prediction):
@@ -142,6 +143,7 @@ def run_epoch(e, network, dataloader, trainer, log_dir, print_name, is_train):
     return epoch_loss
 
 if __name__ == '__main__':
+
     net = CNNBiLSTM(num_downsamples=num_downsamples, resnet_layer_id=resnet_layer_id,
                     rnn_hidden_states=lstm_hidden_states, rnn_layers=lstm_layers, max_seq_len=max_seq_len, ctx=ctx)
     net.hybridize()
