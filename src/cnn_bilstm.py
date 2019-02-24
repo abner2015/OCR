@@ -55,6 +55,7 @@ class CNNBiLSTM(gluon.HybridBlock):
         return out
 
     def get_body(self,resnet_layer_id):
+
         pretrained = resnet34_v1(pretrained=True,ctx=self.ctx)
         pretrained_2 = resnet34_v1(pretrained=True,ctx=mx.cpu(0))
         first_weights = pretrained_2.features[0].weight.data().mean(axis=1).expand_dims(axis=1)
@@ -65,6 +66,7 @@ class CNNBiLSTM(gluon.HybridBlock):
             first_layer.weight.set_data(first_weights)
             body.add(first_layer)
             body.add(*pretrained.features[1:-resnet_layer_id])
+
         return body
 
     def get_encoder(self,rnn_hidden_states,rnn_layers,max_seq_len):
@@ -82,6 +84,7 @@ class CNNBiLSTM(gluon.HybridBlock):
         return decoder
 
     def hybrid_forward(self, F, x):
+        print("hy ",x)
         features = self.body(x)
         hidden_states = []
         hs = self.encoders[0](features)
@@ -92,6 +95,7 @@ class CNNBiLSTM(gluon.HybridBlock):
             hidden_states.append(hs)
         hs = F.concat(*hidden_states,dim=2)
         output = self.decoder(hs)
+
         return output
 
 

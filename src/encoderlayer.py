@@ -14,6 +14,7 @@ class EncoderLayer(gluon.HybridBlock):
         x = x.transpose((0,3,1,2))
         x = x.flatten()
         x = x.split(num_outputs=self.max_seq_len,axis=1)#(SEQ_LEN,N,CHANNELS)
+        print("split later")
         x = F.concat(*[elem.expand_dims(axis=0) for elem in x],dim=0)
         x = self.lstm(x)
         x = x.transpose((1,0,2)) #(N,SEQ_LEN,HIDDEN_UNITS)
