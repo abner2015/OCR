@@ -28,7 +28,7 @@ ctx = mx.gpu() if mx.context.num_gpus() > 0 else mx.cpu()
 
 epochs = 120
 learning_rate = 0.0001
-batch_size = 2
+batch_size = 3
 
 max_seq_len = 160
 print_every_n = 5
@@ -46,8 +46,9 @@ def transform(image, label):
     This function resizes the input image and converts so that it could be fed into the network.
     Furthermore, the label (text) is one-hot encoded.
     '''
-    image = np.expand_dims(image, axis=0).astype(np.float32)
-    #print(image[0,0,0])
+
+    #image = np.expand_dims(image, axis=0).astype(np.float32)
+
     if (image[0, 0, 0] > 1).all():
         image = image /255.
     image = (image - 0.942532484060557) / 0.15926149044640417
@@ -60,7 +61,8 @@ def transform(image, label):
         for letter in word:
             label_encoded[i] = alphabet_dict[letter]
             i += 1
-    #print(type(image))
+    image = np.reshape(image, (3, 224, 224))
+    image = np.resize(image,(1, 224, 224))
     return image, label_encoded
 
 def augment_transform(image, label):
@@ -127,8 +129,8 @@ def decode(prediction):
 
 def run_epoch(e, network, dataloader, trainer, log_dir, print_name, is_train):
     total_loss = nd.zeros(1, ctx)
-    i = 0
     for i, (x, y) in enumerate(dataloader):
+        #print("x, y ",x.shape,y)
         x = x.as_in_context(ctx)
         y = y.as_in_context(ctx)
         with autograd.record(train_mode=is_train):
@@ -148,7 +150,6 @@ def run_epoch(e, network, dataloader, trainer, log_dir, print_name, is_train):
             print("{} first decoded text = {}".format(print_name, decoded_text[0]))
             with SummaryWriter(logdir=log_dir, verbose=False, flush_secs=5) as sw:
                 sw.add_image('bb_{}_image'.format(print_name),output_image,global_step=e)
-            i = 1
 
         total_loss += loss_ctc.mean()
     # print(total_loss.asscalar())
@@ -159,38 +160,38 @@ def run_epoch(e, network, dataloader, trainer, log_dir, print_name, is_train):
         sw.add_scalar('loss', {print_name: epoch_loss}, global_step=e)
 
     return epoch_loss
-import mxnet.gluon.data as data
+from mxnet.gluon import data
 import cv2
+from skimage.transform import rescale, resize
+from skimage import color
 class OCRDataset(data.Dataset):
     def __init__(self,root):
         self.root = root
-        self.data = []
-        self.label = []
+        self._data = []
+        self._label = []
 
         for root1,dir,files in os.walk(self.root):
             for file in files:
                 image_path = root1+file
                 #image = cv2.imread(image_path)
                 image = io.imread(image_path)
+                image = resize(image, (224, 224),
+                       anti_aliasing=True)
                 #image = mx.image.imread(image_path)
                 label = file.split("=")[-1].replace(".jpg", "")
-                self.data.append(image)
-
-                self.label.append(label)
+                self._data.append(image)
+                self._label.append(label)
 
     def __getitem__(self, idx):
-        print("idx ",idx)
-        print("label ", self.label[idx])
-        print("__getitem__",np.array(self.data[idx]).shape,np.array(self.label[idx]).shape)
-        return self.data[idx], self.label[idx]
+        return (self._data[idx], self._label[idx])
     def __len__(self):
-        return len(self.data)
+        return len(self._data)
 if __name__ == '__main__':
-    log_dir = "E:/project/OCR/logs/handwriting_recognition"
+    log_dir = "/home/abner/dnn/project/mxnet/OCR/logs/handwriting_recognition"
     checkpoint_dir = "model_checkpoint"
     checkpoint_name = "handwriting.params"
-    train_path = "E:/project/OCR/data/train/"
-    test_path = "E:/project/OCR/data/train/"
+    train_path = "/home/abner/dnn/project/mxnet/OCR/data/train/"
+    test_path = "/home/abner/dnn/project/mxnet/OCR/data/train/"
     ###
     train_ds = OCRDataset(train_path)
     print("Number of training samples: {}".format(len(train_ds)))
@@ -199,13 +200,17 @@ if __name__ == '__main__':
     print("Number of testing samples: {}".format(len(test_ds)))
     train_data = gluon.data.DataLoader(train_ds.transform(augment_transform), batch_size, shuffle=True,
                                        last_batch="rollover", num_workers=0)
-
     test_data = gluon.data.DataLoader(test_ds.transform(transform), batch_size, shuffle=True, last_batch="keep",num_workers=1)  # , num_workers=multiprocessing.cpu_count()-2)
 
     ###
     net = CNNBiLSTM(num_downsamples=num_downsamples, resnet_layer_id=resnet_layer_id,
                     rnn_hidden_states=lstm_hidden_states, rnn_layers=lstm_layers, max_seq_len=max_seq_len, ctx=ctx)
+
     net.hybridize()
+    hybridlayer_params = {k: v for k, v in net.collect_params().items()}
+
+    for key, value in hybridlayer_params.items():
+        print('{} = {}\n'.format(key, value.shape))
     trainer = gluon.Trainer(net.collect_params(), 'adam', {'learning_rate': learning_rate})
     for e in range(epochs):
         train_loss = run_epoch(e, net, train_data, trainer, log_dir, print_name="train", is_train=True)
