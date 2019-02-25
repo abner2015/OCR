@@ -47,7 +47,7 @@ def transform(image, label):
     Furthermore, the label (text) is one-hot encoded.
     '''
     image = np.expand_dims(image, axis=0).astype(np.float32)
-    print("image ",type(image))
+    #print(image[0,0,0])
     if (image[0, 0, 0] > 1).all():
         image = image /255.
     image = (image - 0.942532484060557) / 0.15926149044640417
@@ -60,7 +60,7 @@ def transform(image, label):
         for letter in word:
             label_encoded[i] = alphabet_dict[letter]
             i += 1
-    print(type(image))
+    #print(type(image))
     return image, label_encoded
 
 def augment_transform(image, label):
@@ -127,6 +127,7 @@ def decode(prediction):
 
 def run_epoch(e, network, dataloader, trainer, log_dir, print_name, is_train):
     total_loss = nd.zeros(1, ctx)
+    i = 0
     for i, (x, y) in enumerate(dataloader):
         x = x.as_in_context(ctx)
         y = y.as_in_context(ctx)
@@ -147,6 +148,7 @@ def run_epoch(e, network, dataloader, trainer, log_dir, print_name, is_train):
             print("{} first decoded text = {}".format(print_name, decoded_text[0]))
             with SummaryWriter(logdir=log_dir, verbose=False, flush_secs=5) as sw:
                 sw.add_image('bb_{}_image'.format(print_name),output_image,global_step=e)
+            i = 1
 
         total_loss += loss_ctc.mean()
     # print(total_loss.asscalar())
@@ -157,13 +159,13 @@ def run_epoch(e, network, dataloader, trainer, log_dir, print_name, is_train):
         sw.add_scalar('loss', {print_name: epoch_loss}, global_step=e)
 
     return epoch_loss
-from mxnet.gluon.data import dataset
+import mxnet.gluon.data as data
 import cv2
-class OCRDataset(dataset.Dataset):
+class OCRDataset(data.Dataset):
     def __init__(self,root):
         self.root = root
-        self._data = []
-        self._label = []
+        self.data = []
+        self.label = []
 
         for root1,dir,files in os.walk(self.root):
             for file in files:
@@ -172,13 +174,17 @@ class OCRDataset(dataset.Dataset):
                 image = io.imread(image_path)
                 #image = mx.image.imread(image_path)
                 label = file.split("=")[-1].replace(".jpg", "")
-                self._data.append(image)
-                self._label.append(label)
+                self.data.append(image)
+
+                self.label.append(label)
 
     def __getitem__(self, idx):
-        return (self._data[idx], self._label[idx])
+        print("idx ",idx)
+        print("label ", self.label[idx])
+        print("__getitem__",np.array(self.data[idx]).shape,np.array(self.label[idx]).shape)
+        return self.data[idx], self.label[idx]
     def __len__(self):
-        return len(self._data)
+        return len(self.data)
 if __name__ == '__main__':
     log_dir = "E:/project/OCR/logs/handwriting_recognition"
     checkpoint_dir = "model_checkpoint"
@@ -193,6 +199,7 @@ if __name__ == '__main__':
     print("Number of testing samples: {}".format(len(test_ds)))
     train_data = gluon.data.DataLoader(train_ds.transform(augment_transform), batch_size, shuffle=True,
                                        last_batch="rollover", num_workers=0)
+
     test_data = gluon.data.DataLoader(test_ds.transform(transform), batch_size, shuffle=True, last_batch="keep",num_workers=1)  # , num_workers=multiprocessing.cpu_count()-2)
 
     ###
