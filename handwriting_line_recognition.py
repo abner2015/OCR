@@ -17,8 +17,8 @@ np.seterr(all='raise')
 import multiprocessing
 mx.random.seed(1)
 
-from .utils.iam_dataset import IAMDataset, resize_image
-from .utils.draw_text_on_image import draw_text_on_image
+# from .utils.iam_dataset import IAMDataset, resize_image
+# from .utils.draw_text_on_image import draw_text_on_image
 
 print_every_n = 1
 send_image_every_n = 20
@@ -189,15 +189,15 @@ class Network(gluon.HybridBlock):
         output = self.decoder(hs)
         return output
 
-def handwriting_recognition_transform(image, line_image_size):
-    '''
-    Resize and normalise the image to be fed into the network.
-    '''
-    image, _ = resize_image(image, line_image_size)
-    image = mx.nd.array(image)/255.
-    image = (image - 0.942532484060557) / 0.15926149044640417
-    image = image.expand_dims(0).expand_dims(0)
-    return image
+# def handwriting_recognition_transform(image, line_image_size):
+#     '''
+#     Resize and normalise the image to be fed into the network.
+#     '''
+#     image, _ = resize_image(image, line_image_size)
+#     image = mx.nd.array(image)/255.
+#     image = (image - 0.942532484060557) / 0.15926149044640417
+#     image = image.expand_dims(0).expand_dims(0)
+#     return image
 
 def transform(image, label):
     '''
@@ -262,7 +262,20 @@ def decode(prediction):
         results.append(result)
     words = [''.join(word) for word in results]
     return words
+import cv2
+def draw_text_on_image(images, text):
+    output_image_shape = (images.shape[0], images.shape[1], images.shape[2] * 2,
+                          images.shape[3])  # Double the output_image_shape to print the text in the bottom
 
+    output_images = np.zeros(shape=output_image_shape)
+    for i in range(images.shape[0]):
+        white_image_shape = (images.shape[2], images.shape[3])
+        white_image = np.ones(shape=white_image_shape) * 1.0
+        text_image = cv2.putText(white_image, text[i], org=(5, 30), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1,
+                                 color=0.0, thickness=1)
+        output_images[i, :, :images.shape[2], :] = images[i]
+        output_images[i, :, images.shape[2]:, :] = text_image
+    return output_images
 def run_epoch(e, network, dataloader, trainer, log_dir, print_name, is_train):
     '''
     Run one epoch to train or test the CNN-biLSTM network
@@ -322,7 +335,34 @@ def run_epoch(e, network, dataloader, trainer, log_dir, print_name, is_train):
         sw.add_scalar('loss', {print_name: epoch_loss}, global_step=e)
 
     return epoch_loss
+from skimage import exposure,io
+from skimage.transform import rescale, resize
+class OCRDataset(mx.gluon.data.Dataset):
+    def __init__(self,root):
+        self.root = root
+        self.data = []
+        self.label = []
 
+        for root1,dir,files in os.walk(self.root):
+            for file in files:
+                image_path = root1+file
+                #image = cv2.imread(image_path)
+                image = io.imread(image_path)
+                image = resize(image, (224, 224),
+                       anti_aliasing=True)
+                #image = mx.image.imread(image_path)
+                label = file.split("=")[-1].replace(".jpg", "")
+                self.data.append(image)
+
+                self.label.append(label)
+
+    def __getitem__(self, idx):
+        #print("idx ",idx)
+        #print("label ", self.label[idx])
+        #print("__getitem__",np.array(self.data[idx]).shape,np.array(self.label[idx]).shape)
+        return self.data[idx], self.label[idx]
+    def __len__(self):
+        return len(self.data)
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-g", "--gpu_id", default="0",
@@ -381,11 +421,11 @@ if __name__ == "__main__":
     
     gpu_ids = [int(elem) for elem in args.gpu_id.split(",")]
     
-    if gpu_ids == [-1]:
-        ctx=[mx.cpu()]
-    else:
-        ctx=[mx.gpu(i) for i in gpu_ids]
-
+    # if gpu_ids == [-1]:
+    #     ctx=[mx.cpu()]
+    # else:
+    #     ctx=[mx.gpu(i) for i in gpu_ids]
+    ctx = mx.cpu(0)
     line_or_word = args.line_or_word
     assert line_or_word in ["line", "word"], "{} is not a value option in [\"line\", \"word\"]"
         
@@ -423,14 +463,14 @@ if __name__ == "__main__":
     if load_model is not None and os.path.isfile(os.path.join(checkpoint_dir,load_model)):
         net.load_parameters(os.path.join(checkpoint_dir,load_model))
         
-    train_ds = IAMDataset(line_or_word, output_data="text", train=True)
+    train_ds = OCRDataset(line_or_word)
     print("Number of training samples: {}".format(len(train_ds)))
     
-    test_ds = IAMDataset(line_or_word, output_data="text", train=False)
+    test_ds = OCRDataset(line_or_word)
     print("Number of testing samples: {}".format(len(test_ds)))
     
-    train_data = gluon.data.DataLoader(train_ds.transform(augment_transform), batch_size, shuffle=True, last_batch="rollover", num_workers=4*len(ctx))
-    test_data = gluon.data.DataLoader(test_ds.transform(transform), batch_size, shuffle=True, last_batch="discard", num_workers=4*len(ctx))
+    train_data = gluon.data.DataLoader(train_ds.transform(augment_transform), batch_size, shuffle=True, last_batch="rollover", num_workers=0)
+    test_data = gluon.data.DataLoader(test_ds.transform(transform), batch_size, shuffle=True, last_batch="discard", num_workers=0)
     
     schedule = mx.lr_scheduler.FactorScheduler(step=lr_period*len(train_data), factor=lr_scale)
     schedule.base_lr = learning_rate

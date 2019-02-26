@@ -1,10 +1,35 @@
 from mxnet import gluon
 import mxnet as mx
 from mxnet.gluon.model_zoo.vision import resnet34_v1
-from src.encoderlayer import EncoderLayer
-
+#from src.encoderlayer import EncoderLayer
+import os
+os.environ["PATH"] += os.pathsep + 'D:/devTool/release/bin'
 alphabet_encoding = r' !"#&\'()*+,-./0123456789:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 alphabet_dict = {alphabet_encoding[i]:i for i in range(len(alphabet_encoding))}
+
+class EncoderLayer(gluon.HybridBlock):
+    '''
+    1.Get image features from CNN
+    2.Transposed the features so that the LSTM sllices (sequentially)
+    '''
+    def __init__(self,hidden_states=200,rnn_layers=1,max_seq_len=100,input_size=1568,**kwargs):
+        self.max_seq_len = max_seq_len
+        super(EncoderLayer,self).__init__(**kwargs)
+        with self.name_scope():
+            self.lstm = gluon.rnn.LSTM(hidden_states,rnn_layers,bidirectional=True,input_size=input_size)
+    def hybrid_forward(self, F, x):
+        #print("infer", x.infer_shape(x))
+        x1 = x.transpose((0,3,1,2))
+        x = x1.flatten()
+        x = x.split(num_outputs=self.max_seq_len,axis=1)#(SEQ_LEN,N,CHANNELS)
+        #mx.viz.plot_network(x).view()
+        x = F.concat(*[elem.expand_dims(axis=0) for elem in x],dim=0)
+        x = self.lstm(x)
+        #mx.viz.plot_network(x).view()
+        x = x.transpose((1,0,2)) #(N,SEQ_LEN,HIDDEN_UNITS)
+
+        return x
+
 class CNNBiLSTM(gluon.HybridBlock):
     '''
     recognise the image
@@ -29,7 +54,13 @@ class CNNBiLSTM(gluon.HybridBlock):
             self.encoders = gluon.nn.HybridSequential()
             with self.encoders.name_scope():
                 for i in range(self.num_downsamples):
-                    encoder = self.get_encoder(rnn_hidden_states=rnn_hidden_states,rnn_layers=rnn_layers,max_seq_len=max_seq_len)
+                    if i == 0:
+
+                        input_size = 1568
+                    else:
+                        input_size = 392
+                    print("input size ",input_size)
+                    encoder = self.get_encoder(rnn_hidden_states=rnn_hidden_states,rnn_layers=rnn_layers,input_size=input_size,max_seq_len=max_seq_len)
                     self.encoders.add(encoder)
                 self.decoder = self.get_decoder()
                 self.downsampler = self.get_down_sampler(self.FEATURE_EXTRACTOR_FILTER)
@@ -46,7 +77,7 @@ class CNNBiLSTM(gluon.HybridBlock):
         out = gluon.nn.HybridSequential()
         with out.name_scope():
             for _ in range(2):
-                out.add(gluon.nn.Conv2D(num_filters,3,strides=1,padding=1))
+                out.add(gluon.nn.Conv2D(num_filters,3,strides=1,padding=1,in_channels=64))
                 out.add(gluon.nn.BatchNorm(in_channels=num_filters))
                 out.add(gluon.nn.Activation('relu'))
             out.add(gluon.nn.MaxPool2D(2))
@@ -69,23 +100,28 @@ class CNNBiLSTM(gluon.HybridBlock):
 
         return body
 
-    def get_encoder(self,rnn_hidden_states,rnn_layers,max_seq_len):
+    def get_encoder(self,rnn_hidden_states,rnn_layers,max_seq_len,input_size):
         encoder = gluon.nn.HybridSequential()
         with encoder.name_scope():
-            encoder.add(EncoderLayer(hidden_states=rnn_hidden_states,rnn_layers=rnn_layers,max_seq_len=max_seq_len))
+            lstm_encoder = EncoderLayer(hidden_states=rnn_hidden_states,rnn_layers=rnn_layers,max_seq_len=max_seq_len,input_size=input_size)
+            hybridlayer_params = {k: v for k, v in lstm_encoder.collect_params().items()}
+            #print("lstm_encoder ", lstm_encoder)
+            for key, value in hybridlayer_params.items():
+                print('{} =w {}\n'.format(key, value.shape))
+            encoder.add(lstm_encoder)
             encoder.add(gluon.nn.Dropout(self.p_dropout))
-        encoder.collect_params().initialize(mx.init.Xavier(),ctx=self.ctx)
+        encoder.collect_params().initialize(mx.init.Xavier(),ctx=self.ctx )
         return encoder
 
     def get_decoder(self):
         alphabet_size = len(alphabet_encoding) + 1
-        decoder = mx.gluon.nn.Dense(units=alphabet_size,flatten=False)
+        decoder = gluon.nn.Dense(units=alphabet_size,flatten=False,in_units=2048)
         decoder.collect_params().initialize(mx.init.Xavier(),ctx=self.ctx)
         return decoder
 
     def hybrid_forward(self, F, x):
-        print("hy ",x)
         features = self.body(x)
+        #mx.viz.plot_network(features).view()
         hidden_states = []
         hs = self.encoders[0](features)
         hidden_states.append(hs)
@@ -95,7 +131,7 @@ class CNNBiLSTM(gluon.HybridBlock):
             hidden_states.append(hs)
         hs = F.concat(*hidden_states,dim=2)
         output = self.decoder(hs)
-
+        #mx.viz.plot_network(output).view()
         return output
 
 
