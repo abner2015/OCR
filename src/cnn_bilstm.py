@@ -12,15 +12,15 @@ class EncoderLayer(gluon.HybridBlock):
     1.Get image features from CNN
     2.Transposed the features so that the LSTM sllices (sequentially)
     '''
-    def __init__(self,hidden_states=200,rnn_layers=1,max_seq_len=100,input_size=1568,**kwargs):
+    def __init__(self,hidden_states=200,rnn_layers=1,max_seq_len=100,input_size=3584,**kwargs):
         self.max_seq_len = max_seq_len
         super(EncoderLayer,self).__init__(**kwargs)
         with self.name_scope():
             self.lstm = gluon.rnn.LSTM(hidden_states,rnn_layers,bidirectional=True,input_size=input_size)
     def hybrid_forward(self, F, x):
         #print("infer", x.infer_shape(x))
-        x1 = x.transpose((0,3,1,2))
-        x = x1.flatten()
+        x = x.transpose((0,3,1,2))
+        x = x.flatten()
         x = x.split(num_outputs=self.max_seq_len,axis=1)#(SEQ_LEN,N,CHANNELS)
         #mx.viz.plot_network(x).view()
         x = F.concat(*[elem.expand_dims(axis=0) for elem in x],dim=0)
@@ -56,11 +56,11 @@ class CNNBiLSTM(gluon.HybridBlock):
                 for i in range(self.num_downsamples):
                     if i == 0:
 
-                        input_size = 1568
+                        input_size = 3584
                     else:
-                        input_size = 392
+                        input_size = 896
                     print("input size ",input_size)
-                    encoder = self.get_encoder(rnn_hidden_states=rnn_hidden_states,rnn_layers=rnn_layers,input_size=input_size,max_seq_len=max_seq_len)
+                    encoder = self.get_encoder(rnn_hidden_states=rnn_hidden_states,rnn_layers=rnn_layers,input_size=input_size,max_seq_len=self.max_seq_len)
                     self.encoders.add(encoder)
                 self.decoder = self.get_decoder()
                 self.downsampler = self.get_down_sampler(self.FEATURE_EXTRACTOR_FILTER)
@@ -104,10 +104,10 @@ class CNNBiLSTM(gluon.HybridBlock):
         encoder = gluon.nn.HybridSequential()
         with encoder.name_scope():
             lstm_encoder = EncoderLayer(hidden_states=rnn_hidden_states,rnn_layers=rnn_layers,max_seq_len=max_seq_len,input_size=input_size)
-            hybridlayer_params = {k: v for k, v in lstm_encoder.collect_params().items()}
+            #hybridlayer_params = {k: v for k, v in lstm_encoder.collect_params().items()}
             #print("lstm_encoder ", lstm_encoder)
-            for key, value in hybridlayer_params.items():
-                print('{} =w {}\n'.format(key, value.shape))
+            # for key, value in hybridlayer_params.items():
+            #     print('{} =w {}\n'.format(key, value.shape))
             encoder.add(lstm_encoder)
             encoder.add(gluon.nn.Dropout(self.p_dropout))
         encoder.collect_params().initialize(mx.init.Xavier(),ctx=self.ctx )

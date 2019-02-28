@@ -26,11 +26,11 @@ random_y_scaling, random_x_scaling = 0.1, 0.1
 random_shearing = 0.7
 ctx = mx.gpu() if mx.context.num_gpus() > 0 else mx.cpu()
 
-epochs = 120
+epochs = 130
 learning_rate = 0.0001
-batch_size = 1
+batch_size = 3
 
-max_seq_len = 128
+max_seq_len = 56
 print_every_n = 5
 send_image_every_n = 5
 
@@ -216,7 +216,7 @@ if __name__ == '__main__':
 
     test_ds = OCRDataset(train_path)
     print("Number of testing samples: {}".format(len(test_ds)))
-    train_data = gluon.data.DataLoader(train_ds.transform(augment_transform), batch_size, shuffle=True,
+    train_data = gluon.data.DataLoader(train_ds.transform(transform), batch_size, shuffle=True,
                                        last_batch="rollover", num_workers=0)
 
     test_data = gluon.data.DataLoader(test_ds.transform(transform), batch_size, shuffle=True, last_batch="keep",num_workers=0)  # , num_workers=multiprocessing.cpu_count()-2)
