@@ -1,34 +1,11 @@
 from mxnet import gluon
 import mxnet as mx
 from mxnet.gluon.model_zoo.vision import resnet34_v1
-#from src.encoderlayer import EncoderLayer
+from src.encoderlayer import EncoderLayer
 import os
 os.environ["PATH"] += os.pathsep + 'D:/devTool/release/bin'
 alphabet_encoding = r' !"#&\'()*+,-./0123456789:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 alphabet_dict = {alphabet_encoding[i]:i for i in range(len(alphabet_encoding))}
-
-class EncoderLayer(gluon.HybridBlock):
-    '''
-    1.Get image features from CNN
-    2.Transposed the features so that the LSTM sllices (sequentially)
-    '''
-    def __init__(self,hidden_states=200,rnn_layers=1,max_seq_len=100,input_size=3584,**kwargs):
-        self.max_seq_len = max_seq_len
-        super(EncoderLayer,self).__init__(**kwargs)
-        with self.name_scope():
-            self.lstm = gluon.rnn.LSTM(hidden_states,rnn_layers,bidirectional=True,input_size=input_size)
-    def hybrid_forward(self, F, x):
-        #print("infer", x.infer_shape(x))
-        x = x.transpose((0,3,1,2))
-        x = x.flatten()
-        x = x.split(num_outputs=self.max_seq_len,axis=1)#(SEQ_LEN,N,CHANNELS)
-        #mx.viz.plot_network(x).view()
-        x = F.concat(*[elem.expand_dims(axis=0) for elem in x],dim=0)
-        x = self.lstm(x)
-        #mx.viz.plot_network(x).view()
-        x = x.transpose((1,0,2)) #(N,SEQ_LEN,HIDDEN_UNITS)
-
-        return x
 
 class CNNBiLSTM(gluon.HybridBlock):
     '''
@@ -55,10 +32,11 @@ class CNNBiLSTM(gluon.HybridBlock):
             with self.encoders.name_scope():
                 for i in range(self.num_downsamples):
                     if i == 0:
-
-                        input_size = 3584
+                        input_size = 1024  # input 128x64
+                        #input_size = 3584 #input 224
                     else:
-                        input_size = 896
+                        input_size = 256  # input 128x64
+                        # input_size = 896 #input 224
                     print("input size ",input_size)
                     encoder = self.get_encoder(rnn_hidden_states=rnn_hidden_states,rnn_layers=rnn_layers,input_size=input_size,max_seq_len=self.max_seq_len)
                     self.encoders.add(encoder)

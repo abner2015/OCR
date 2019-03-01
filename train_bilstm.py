@@ -16,6 +16,12 @@ from skimage import exposure,io
 
 from tqdm import tqdm
 from src.cnn_bilstm import CNNBiLSTM
+from mxnet.gluon import data
+import cv2
+from skimage.transform import rescale, resize
+from skimage import color
+from src.dataset.ocr_dataset import OCRDataset
+
 
 np.seterr(all='raise')
 alphabet_encoding = r' !"#&\'()*+,-./0123456789:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
@@ -27,10 +33,10 @@ random_shearing = 0.7
 ctx = mx.gpu() if mx.context.num_gpus() > 0 else mx.cpu()
 
 epochs = 130
-learning_rate = 0.0001
+learning_rate = 0.001
 batch_size = 3
 
-max_seq_len = 56
+max_seq_len = 32
 print_every_n = 5
 send_image_every_n = 5
 
@@ -41,6 +47,7 @@ lstm_layers = 2
 
 ctc_loss = gluon.loss.CTCLoss(weight=0.2)
 best_test_loss = 10e5
+
 def transform(image, label):
     '''
     This function resizes the input image and converts so that it could be fed into the network.
@@ -49,7 +56,6 @@ def transform(image, label):
 
     #image = np.expand_dims(image, axis=0).astype(np.float32)
     #print(image[0,0,0])
-
 
     #image = np.expand_dims(image, axis=0).astype(np.float32)
     image = image.astype(np.float32)
@@ -68,8 +74,8 @@ def transform(image, label):
 
     #print(type(image))
 
-    image = np.reshape(image, (3, 224, 224))
-    image = np.resize(image,(1, 224, 224))
+    image = np.reshape(image, (3, 128, 64))
+    image = np.resize(image,(1, 128, 64))
 
     return image, label_encoded
 
@@ -120,7 +126,6 @@ def decode(prediction):
     '''
     Returns the string given one-hot encoded vectors.
     '''
-
     results = []
     for word in prediction:
         result = []
@@ -138,7 +143,6 @@ def decode(prediction):
 def run_epoch(e, network, dataloader, trainer, log_dir, print_name, is_train):
     total_loss = nd.zeros(1, ctx)
     for i, (x, y) in enumerate(dataloader):
-        #print("x, y ",x.shape,y)
         x = x.as_in_context(ctx)
         y = y.as_in_context(ctx)
         with autograd.record(train_mode=is_train):
@@ -158,11 +162,10 @@ def run_epoch(e, network, dataloader, trainer, log_dir, print_name, is_train):
             print("{} first decoded text = {}".format(print_name, decoded_text[0]))
             with SummaryWriter(logdir=log_dir, verbose=False, flush_secs=5) as sw:
                 sw.add_image('bb_{}_image'.format(print_name),output_image,global_step=e)
-            i = 1
+
 
         total_loss += loss_ctc.mean()
-    # print(total_loss.asscalar())
-    # print(len(dataloader))
+
     epoch_loss = float(total_loss.asscalar())/len(dataloader)
 
     with SummaryWriter(logdir=log_dir, verbose=False, flush_secs=5) as sw:
@@ -170,40 +173,6 @@ def run_epoch(e, network, dataloader, trainer, log_dir, print_name, is_train):
 
     return epoch_loss
 
-import mxnet.gluon.data as data
-import cv2
-
-from mxnet.gluon import data
-import cv2
-from skimage.transform import rescale, resize
-from skimage import color
-
-class OCRDataset(data.Dataset):
-    def __init__(self,root):
-        self.root = root
-        self.data = []
-        self.label = []
-
-        for root1,dir,files in os.walk(self.root):
-            for file in files:
-                image_path = root1+file
-                #image = cv2.imread(image_path)
-                image = io.imread(image_path)
-                image = resize(image, (224, 224),
-                       anti_aliasing=True)
-                #image = mx.image.imread(image_path)
-                label = file.split("=")[-1].replace(".jpg", "")
-                self.data.append(image)
-
-                self.label.append(label)
-
-    def __getitem__(self, idx):
-        #print("idx ",idx)
-        #print("label ", self.label[idx])
-        #print("__getitem__",np.array(self.data[idx]).shape,np.array(self.label[idx]).shape)
-        return self.data[idx], self.label[idx]
-    def __len__(self):
-        return len(self.data)
 if __name__ == '__main__':
     log_dir = "E:/project/OCR/logs/handwriting_recognition"
     checkpoint_dir = "E:/project/OCR/model_checkpoint"
