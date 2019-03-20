@@ -32,8 +32,8 @@ random_y_scaling, random_x_scaling = 0.1, 0.1
 random_shearing = 0.7
 ctx = mx.gpu() if mx.context.num_gpus() > 0 else mx.cpu()
 
-epochs = 400
-learning_rate = 0.01
+epochs = 130
+learning_rate = 0.001
 batch_size = 3
 
 max_seq_len = 32
@@ -74,8 +74,8 @@ def transform(image, label):
 
     #print(type(image))
 
-    image = np.reshape(image, (3, 64, 128))
-    image = np.resize(image,(1, 64, 128))
+    image = np.reshape(image, (3, 128, 64))
+    image = np.resize(image,(1, 128, 64))
 
     return image, label_encoded
 
@@ -194,28 +194,22 @@ if __name__ == '__main__':
     net = CNNBiLSTM(num_downsamples=num_downsamples, resnet_layer_id=resnet_layer_id,
                     rnn_hidden_states=lstm_hidden_states, rnn_layers=lstm_layers, max_seq_len=max_seq_len, ctx=ctx)
 
-    net.hybridize()
-    #net.initialize(init=mx.init.Xavier(), force_reinit=True)
-    hybridlayer_params = {k: v for k, v in net.collect_params().items()}
-    print("net ",net)
-    for key, value in hybridlayer_params.items():
-        print('{} = {}\n'.format(key, value.shape))
-    # trainer = gluon.Trainer(net.collect_params(), 'adam', {'learning_rate': learning_rate,'wd':0.001})
-    trainer = gluon.Trainer(net.collect_params(), 'sgd', {'learning_rate': learning_rate, 'wd': 0.001})
-    lr_counter = 0
-    lr_factor = 0.75
-    lr_steps = [10, 60, 80, np.inf]
-    for e in range(epochs):
-        if e == lr_steps[lr_counter]:
-            trainer.set_learning_rate(trainer.learning_rate * lr_factor)
-            lr_counter += 1
-        train_loss = run_epoch(e, net, train_data, trainer, log_dir, print_name="train", is_train=True)
-        test_loss = run_epoch(e, net, test_data, trainer, log_dir, print_name="test", is_train=False)
-        if test_loss < best_test_loss:
-            print("Saving network, previous best test loss {:.6f}, current test loss {:.6f}".format(best_test_loss,
-                                                                                                    test_loss))
-            net.save_parameters(os.path.join(checkpoint_dir, checkpoint_name))
-            best_test_loss = test_loss
+    net.load_parameters(os.path.join(checkpoint_dir,checkpoint_name))
+    length = len(test_ds)
+    for n in range(length):
+        # x = x.as_in_context(ctx)
+        # y = y.as_in_context(ctx)
+        n = int(random.random() * len(test_ds))
+        image, actual_label = test_ds[n]
 
-        if e % print_every_n == 0 and e > 0:
-            print("Epoch {0}, train_loss {1:.6f}, test_loss {2:.6f}".format(e, train_loss, test_loss))
+        image, _ = transform(image, actual_label)
+
+        image = nd.array(image)
+        image = image.as_in_context(ctx)
+        image = image.expand_dims(axis=0)
+        output = net(image)
+        predictions = output.softmax().topk(axis=2).asnumpy()
+        decoded_text = decode(predictions)
+        print("result ",decoded_text,actual_label)
+    #net.initialize(init=mx.init.Xavier(), force_reinit=True)
+
