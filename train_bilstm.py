@@ -21,7 +21,7 @@ import cv2
 from skimage.transform import rescale, resize
 from skimage import color
 from src.dataset.ocr_dataset import OCRDataset
-
+from src.cnn_attention_bilstm import CNNAttentionBiLSTM
 
 np.seterr(all='raise')
 alphabet_encoding = r' !"#&\'()*+,-./0123456789:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
@@ -32,8 +32,8 @@ random_y_scaling, random_x_scaling = 0.1, 0.1
 random_shearing = 0.7
 ctx = mx.gpu() if mx.context.num_gpus() > 0 else mx.cpu()
 
-epochs = 400
-learning_rate = 0.01
+epochs = 800
+learning_rate = 0.001
 batch_size = 3
 
 max_seq_len = 32
@@ -43,9 +43,9 @@ send_image_every_n = 5
 num_downsamples = 2
 resnet_layer_id = 4
 lstm_hidden_states = 512
-lstm_layers = 2
+lstm_layers = 1
 
-ctc_loss = gluon.loss.CTCLoss(weight=0.2)
+ctc_loss = gluon.loss.CTCLoss(weight=0.02)
 best_test_loss = 10e5
 
 def transform(image, label):
@@ -191,7 +191,7 @@ if __name__ == '__main__':
     test_data = gluon.data.DataLoader(test_ds.transform(transform), batch_size, shuffle=True, last_batch="keep",num_workers=0)  # , num_workers=multiprocessing.cpu_count()-2)
 
     ###
-    net = CNNBiLSTM(num_downsamples=num_downsamples, resnet_layer_id=resnet_layer_id,
+    net = CNNAttentionBiLSTM(num_downsamples=num_downsamples, resnet_layer_id=resnet_layer_id,
                     rnn_hidden_states=lstm_hidden_states, rnn_layers=lstm_layers, max_seq_len=max_seq_len, ctx=ctx)
 
     net.hybridize()
@@ -200,8 +200,8 @@ if __name__ == '__main__':
     print("net ",net)
     for key, value in hybridlayer_params.items():
         print('{} = {}\n'.format(key, value.shape))
-    # trainer = gluon.Trainer(net.collect_params(), 'adam', {'learning_rate': learning_rate,'wd':0.001})
-    trainer = gluon.Trainer(net.collect_params(), 'sgd', {'learning_rate': learning_rate, 'wd': 0.001})
+    trainer = gluon.Trainer(net.collect_params(), 'adam', {'learning_rate': learning_rate})
+    # trainer = gluon.Trainer(net.collect_params(), 'sgd', {'learning_rate': learning_rate, 'wd': 0.001})
     lr_counter = 0
     lr_factor = 0.75
     lr_steps = [10, 60, 80, np.inf]
