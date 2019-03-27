@@ -33,6 +33,7 @@ class CNNAttentionBiLSTM(gluon.HybridBlock):
             self.body = self.get_body(resnet_layer_id=resnet_layer_id)
             self.encoders = gluon.nn.HybridSequential(prefix="_encoder")
             with self.encoders.name_scope():
+                # because of the num_downsamples is 2 ,encoder has two parts
                 for i in range(self.num_downsamples):
                     if i == 0:
                         input_size = 1024  # input 128x64
@@ -69,7 +70,6 @@ class CNNAttentionBiLSTM(gluon.HybridBlock):
         :return:
         network: gulon.nn.HybridSequential
 
-
         '''
         out = gluon.nn.HybridSequential(prefix="_down")
         with out.name_scope():
@@ -98,13 +98,17 @@ class CNNAttentionBiLSTM(gluon.HybridBlock):
         return body
 
     def get_encoder(self,rnn_hidden_states,rnn_layers,max_seq_len,input_size):
+        """
+        bilstm as the eocoder layer
+        :param rnn_hidden_states:
+        :param rnn_layers:
+        :param max_seq_len:
+        :param input_size:
+        :return:
+        """
         encoder = gluon.nn.HybridSequential()
         with encoder.name_scope():
             lstm_encoder = EncoderLayer(hidden_states=rnn_hidden_states,rnn_layers=rnn_layers,max_seq_len=max_seq_len,input_size=input_size)
-            #hybridlayer_params = {k: v for k, v in lstm_encoder.collect_params().items()}
-            #print("lstm_encoder ", lstm_encoder)
-            # for key, value in hybridlayer_params.items():
-            #     print('{} =w {}\n'.format(key, value.shape))
             encoder.add(lstm_encoder)
             encoder.add(gluon.nn.Dropout(self.p_dropout))
         encoder.collect_params().initialize(mx.init.Xavier(),ctx=self.ctx )
@@ -117,6 +121,12 @@ class CNNAttentionBiLSTM(gluon.HybridBlock):
         return decoder
 
     def hybrid_forward(self, F, x):
+        """
+        input the data flow : encoder ->attention->decoder
+        :param F:
+        :param x:
+        :return:
+        """
         features = self.body(x)
         #mx.viz.plot_network(features).view()
         hidden_states = []
@@ -126,16 +136,17 @@ class CNNAttentionBiLSTM(gluon.HybridBlock):
             features = self.downsampler(features)
             hs = self.encoders[i+1](features) #(N,SEQ_LEN,HIDDEN_UNITS)
             hidden_states.append(hs)
+        # hs : batch_size,seq_len,hidden_units
         hs = F.concat(*hidden_states,dim=2)
         # attention layer
+        #att: batch_size,seq_len,attention_units
         att = self.attention(hs)
-        # print(self.infer_shape(att))
-        att = F.softmax(att, axis=1)#.reshape((3,32,2048))
-        # print(self.infer_shape(att))
-        # encoder_output = hs.swapaxes(0,1)
-        decoder_context = F.batch_dot(att, hs,transpose_a=1)
-        # decoder_context = gemm2(att, hs)
+        # sum of attention_units equal to 1
+        att = F.softmax(att, axis=1)
 
+        # transpose_a = 1: (batch_size,seq_len,attention_units)-->(batch_size,attention_units,seq_len) , decoder_context:(batch_size,attention_units,hidden)
+        decoder_context = F.batch_dot(att, hs,transpose_a=1)
+        # decoder_context:(batch_size,10,2048)
         output = self.decoder(decoder_context)
         # output = self.decoder(att)
         #mx.viz.plot_network(output).view()
