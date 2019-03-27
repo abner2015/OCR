@@ -21,7 +21,7 @@ import cv2
 from skimage.transform import rescale, resize
 from skimage import color
 from src.dataset.ocr_dataset import OCRDataset
-
+from src.cnn_attention_bilstm import CNNAttentionBiLSTM
 
 np.seterr(all='raise')
 alphabet_encoding = r' !"#&\'()*+,-./0123456789:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
@@ -43,9 +43,9 @@ send_image_every_n = 5
 num_downsamples = 2
 resnet_layer_id = 4
 lstm_hidden_states = 512
-lstm_layers = 2
+lstm_layers = 1
 
-ctc_loss = gluon.loss.CTCLoss(weight=0.2)
+ctc_loss = gluon.loss.CTCLoss()
 best_test_loss = 10e5
 
 def transform(image, label):
@@ -74,8 +74,8 @@ def transform(image, label):
 
     #print(type(image))
 
-    image = np.reshape(image, (3, 128, 64))
-    image = np.resize(image,(1, 128, 64))
+    image = np.reshape(image, (3, 64, 128))
+    image = np.resize(image,(1, 64, 128))
 
     return image, label_encoded
 
@@ -176,40 +176,69 @@ def run_epoch(e, network, dataloader, trainer, log_dir, print_name, is_train):
 if __name__ == '__main__':
     log_dir = "E:/project/OCR/logs/handwriting_recognition"
     checkpoint_dir = "E:/project/OCR/model_checkpoint"
-    checkpoint_name = "handwriting.params"
-    train_path = "E:/project/OCR/data/train/"
-    test_path = "E:/project/OCR/data/train/"
+    checkpoint_name = "handwriting2.params"
+    train_path = "E:/project/OCR/data/d/"
+    test_path = "E:/project/OCR/data/d/"
     ###
     train_ds = OCRDataset(train_path)
     print("Number of training samples: {}".format(len(train_ds)))
 
     test_ds = OCRDataset(train_path)
     print("Number of testing samples: {}".format(len(test_ds)))
-    train_data = gluon.data.DataLoader(train_ds.transform(transform), batch_size, shuffle=True,
-                                       last_batch="rollover", num_workers=0)
+    # train_data = gluon.data.DataLoader(train_ds.transform(transform), batch_size, shuffle=True,
+    #                                    last_batch="rollover", num_workers=0)
 
     test_data = gluon.data.DataLoader(test_ds.transform(transform), batch_size, shuffle=True, last_batch="keep",num_workers=0)  # , num_workers=multiprocessing.cpu_count()-2)
 
     ###
-    net = CNNBiLSTM(num_downsamples=num_downsamples, resnet_layer_id=resnet_layer_id,
+    net = CNNAttentionBiLSTM(num_downsamples=num_downsamples, resnet_layer_id=resnet_layer_id,
                     rnn_hidden_states=lstm_hidden_states, rnn_layers=lstm_layers, max_seq_len=max_seq_len, ctx=ctx)
 
     net.load_parameters(os.path.join(checkpoint_dir,checkpoint_name))
+    from mxboard import SummaryWriter
+    sw = SummaryWriter(logdir='./logs')
+    inputs = mx.sym.var('data')
+    out = net(inputs)
+    internals =out.get_internals()
+    print(internals .list_outputs()[-10:])
+    outputs = [internals['cnnattentionbilstm0_softmax0_output']]
+    feat_model = gluon.SymbolBlock(outputs, inputs, params=net.collect_params())
+
+    #x = mx.nd.random.normal(shape=(16, 3, 224, 224))
+    image1, actual_label = test_ds[0]
+
+    image, _ = transform(image1, actual_label)
+
+    image = nd.array(image)
+    image = image.as_in_context(ctx)
+    image = image.expand_dims(axis=0)
+    # print(feat_model(image))
+    sw.add_image(tag='cnnattentionbilstm0_softmax0_output', image=feat_model(image))
+    # sw.add_image(tag='img', image=image1)
+    sw.close()
+
+
+    # outputs = [internals['model_stage1_activation1_output']]
+    # feat_model = gluon.SymbolBlock(outputs, inputs, params=resnet18.collect_params())
     length = len(test_ds)
-    for n in range(length):
-        # x = x.as_in_context(ctx)
-        # y = y.as_in_context(ctx)
-        n = int(random.random() * len(test_ds))
-        image, actual_label = test_ds[n]
-
-        image, _ = transform(image, actual_label)
-
-        image = nd.array(image)
-        image = image.as_in_context(ctx)
-        image = image.expand_dims(axis=0)
-        output = net(image)
-        predictions = output.softmax().topk(axis=2).asnumpy()
-        decoded_text = decode(predictions)
-        print("result ",decoded_text,actual_label)
-    #net.initialize(init=mx.init.Xavier(), force_reinit=True)
-
+    ac = 0
+    # for n in range(length):
+    #     # x = x.as_in_context(ctx)
+    #     # y = y.as_in_context(ctx)
+    #     n = int(random.random() * len(test_ds))
+    #     image, actual_label = test_ds[n]
+    #
+    #     image, _ = transform(image, actual_label)
+    #
+    #     image = nd.array(image)
+    #     image = image.as_in_context(ctx)
+    #     image = image.expand_dims(axis=0)
+    #     output = net(image)
+    #     predictions = output.softmax().topk(axis=2).asnumpy()
+    #     decoded_text = decode(predictions)
+    #     if str(decoded_text[0]) == (actual_label):
+    #         ac = ac +1
+    #     print("result ",decoded_text,actual_label)
+    # print("acc : ",ac/len(test_ds))
+    # #net.initialize(init=mx.init.Xavier(), force_reinit=True)
+    #

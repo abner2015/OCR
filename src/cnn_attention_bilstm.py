@@ -51,11 +51,11 @@ class CNNAttentionBiLSTM(gluon.HybridBlock):
        :return:
        '''
        attention = gluon.nn.HybridSequential(prefix="_attention")
-       alignment_dim = 512
+       alignment_dim = 200
        with attention.name_scope():
            attention.add(gluon.nn.Dense(
-               units=alignment_dim, in_units=2048,activation="tanh",flatten=False ))
-           attention.add(gluon.nn.Dense(units=2048, in_units=alignment_dim,flatten=False))
+               units=alignment_dim, in_units=2048,activation="tanh",flatten=False))
+           attention.add(gluon.nn.Dense(units=10, in_units=alignment_dim,flatten=False))
 
        attention.collect_params().initialize(mx.init.Normal(), ctx=self.ctx)
        attention.hybridize()

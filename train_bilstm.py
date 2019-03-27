@@ -45,7 +45,7 @@ resnet_layer_id = 4
 lstm_hidden_states = 512
 lstm_layers = 1
 
-ctc_loss = gluon.loss.CTCLoss(weight=0.02)
+ctc_loss = gluon.loss.CTCLoss(weight=0.5)
 best_test_loss = 10e5
 
 def transform(image, label):
@@ -62,7 +62,8 @@ def transform(image, label):
     if (image[0, 0, 0] > 1).all():
         image = image /255.
     image = (image - 0.942532484060557) / 0.15926149044640417
-    label_encoded = np.zeros(max_seq_len, dtype=np.float32 ) -1
+    # label_encoded = np.zeros(max_seq_len, dtype=np.float32 ) -1
+    label_encoded = np.zeros(10, dtype=np.float32) - 1
     i = 0
     for word in label:
         word = word.replace("&quot", r'"')
@@ -176,9 +177,9 @@ def run_epoch(e, network, dataloader, trainer, log_dir, print_name, is_train):
 if __name__ == '__main__':
     log_dir = "E:/project/OCR/logs/handwriting_recognition"
     checkpoint_dir = "E:/project/OCR/model_checkpoint"
-    checkpoint_name = "handwriting.params"
-    train_path = "E:/project/OCR/data/train/"
-    test_path = "E:/project/OCR/data/train/"
+    checkpoint_name = "handwriting3.params"
+    train_path = "E:/project/OCR/data/number/"
+    test_path = "E:/project/OCR/data/test/"
     ###
     train_ds = OCRDataset(train_path)
     print("Number of training samples: {}".format(len(train_ds)))
@@ -191,7 +192,7 @@ if __name__ == '__main__':
     test_data = gluon.data.DataLoader(test_ds.transform(transform), batch_size, shuffle=True, last_batch="keep",num_workers=0)  # , num_workers=multiprocessing.cpu_count()-2)
 
     ###
-    net = CNNAttentionBiLSTM(num_downsamples=num_downsamples, resnet_layer_id=resnet_layer_id,
+    net = CNNBiLSTM(num_downsamples=num_downsamples, resnet_layer_id=resnet_layer_id,
                     rnn_hidden_states=lstm_hidden_states, rnn_layers=lstm_layers, max_seq_len=max_seq_len, ctx=ctx)
 
     net.hybridize()
@@ -201,7 +202,7 @@ if __name__ == '__main__':
     for key, value in hybridlayer_params.items():
         print('{} = {}\n'.format(key, value.shape))
     trainer = gluon.Trainer(net.collect_params(), 'adam', {'learning_rate': learning_rate})
-    # trainer = gluon.Trainer(net.collect_params(), 'sgd', {'learning_rate': learning_rate, 'wd': 0.001})
+    # trainer = gluon.Trainer(net.collect_params(), 'sgd', {'learning_rate': learning_rate,'momentum':0.9, 'wd': 0.001})
     lr_counter = 0
     lr_factor = 0.75
     lr_steps = [10, 60, 80, np.inf]
@@ -219,3 +220,4 @@ if __name__ == '__main__':
 
         if e % print_every_n == 0 and e > 0:
             print("Epoch {0}, train_loss {1:.6f}, test_loss {2:.6f}".format(e, train_loss, test_loss))
+    net.export("lstm.json")
