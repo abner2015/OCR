@@ -4,7 +4,7 @@ The project include 4 parts:
 
 - [x] 1.lstm ocr 
 - [x] 2.cnn-lstm ocr
-- [ ] 3.cnn-seq2seq ocr
-- [ ] 4.cnn-seq2seq attention ocr
+- [x] 3.cnn-seq2seq ocr
+- [x] 4.cnn-seq2seq attention ocr
 
  [回到顶部](#readme)
