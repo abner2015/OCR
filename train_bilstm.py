@@ -32,7 +32,7 @@ random_y_scaling, random_x_scaling = 0.1, 0.1
 random_shearing = 0.7
 ctx = mx.gpu() if mx.context.num_gpus() > 0 else mx.cpu()
 
-epochs = 800
+epochs = 20
 learning_rate = 0.001
 batch_size = 3
 
@@ -58,10 +58,12 @@ def transform(image, label):
     #print(image[0,0,0])
 
     #image = np.expand_dims(image, axis=0).astype(np.float32)
+    mean = [180.40889436908472, 171.7787512809523, 173.99838366125906]
+    mean_pixels_nd = mx.nd.array(mean).reshape((3, 1, 1))
     image = image.astype(np.float32)
-    if (image[0, 0, 0] > 1).all():
-        image = image /255.
-    image = (image - 0.942532484060557) / 0.15926149044640417
+    # if (image[0, 0, 0] > 1).all():
+    #     image = image /255.
+    # image = (image - 0.942532484060557) / 0.15926149044640417
     # label_encoded = np.zeros(max_seq_len, dtype=np.float32 ) -1
     label_encoded = np.zeros(10, dtype=np.float32) - 1
     i = 0
@@ -76,6 +78,7 @@ def transform(image, label):
     #print(type(image))
 
     image = np.reshape(image, (3, 64, 128))
+    # image = image - mean_pixels_nd
     image = np.resize(image,(1, 64, 128))
 
     return image, label_encoded
@@ -177,9 +180,9 @@ def run_epoch(e, network, dataloader, trainer, log_dir, print_name, is_train):
 if __name__ == '__main__':
     log_dir = "E:/project/OCR/logs/handwriting_recognition"
     checkpoint_dir = "E:/project/OCR/model_checkpoint"
-    checkpoint_name = "handwriting3.params"
-    train_path = "E:/project/OCR/data/number/"
-    test_path = "E:/project/OCR/data/test/"
+    checkpoint_name = "handwriting_train.params"
+    train_path = "E:/project/OCR/data/train/"
+    test_path = "E:/project/OCR/data/train/"
     ###
     train_ds = OCRDataset(train_path)
     print("Number of training samples: {}".format(len(train_ds)))
@@ -192,7 +195,7 @@ if __name__ == '__main__':
     test_data = gluon.data.DataLoader(test_ds.transform(transform), batch_size, shuffle=True, last_batch="keep",num_workers=0)  # , num_workers=multiprocessing.cpu_count()-2)
 
     ###
-    net = CNNBiLSTM(num_downsamples=num_downsamples, resnet_layer_id=resnet_layer_id,
+    net = CNNAttentionBiLSTM(num_downsamples=num_downsamples, resnet_layer_id=resnet_layer_id,
                     rnn_hidden_states=lstm_hidden_states, rnn_layers=lstm_layers, max_seq_len=max_seq_len, ctx=ctx)
 
     net.hybridize()

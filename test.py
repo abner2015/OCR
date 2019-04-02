@@ -80,7 +80,44 @@ class OCRDataset(mx.gluon.data.Dataset):
         return len(self.data)
 
 if __name__ =='__main__':
-    #OCRDataset("E:/project/OCR/data/train/")
-    for i, data in enumerate(mx.gluon.data.DataLoader(TestSet(), batch_size=2)):
-        print(data)
-   #to_ctc_format("0001011",20)
+    import shutil
+    # src='D:/zzz/bg.jpg'
+    # dst='E:/tmp/bg.jpg'
+    # shutil.copyfile(src,dst)
+    file_path = "E:\project\AI\VEM\image_path"
+    new_path = "E:\project\OCR\data\copy/"
+    f = open(file_path,'r')
+    for line in f.readlines():
+        # print(line)
+        s = line.split("/")[-1]
+        print(s)
+        shutil.copy(line.replace("\n",""),new_path+s.replace("\n",""))
+
+   #  s = {"a":1,"b":2}
+   #  for k,v in s.items():
+   #      print(k,v)
+   #  from skimage.transform import resize
+   #  img_path = "E:\project\OCR\data/train\CHAT0031.xml=7575.jpg"
+   #
+   #  image = io.imread(img_path)
+   #  #image = resize(image,(64,128))
+   #  # image /= 225
+   #  # io.imshow(image)
+   #  image = image.astype(np.float32)
+   #
+   #  if (image[0, 0, 0] > 1).all():
+   #      print("dddd")
+   #      image = image / 255.
+   #  image = (image - 0.942532484060557) / 0.15926149044640417
+   #  io.imshow(image)
+   #  print("mean ",image.mean())
+   #  image = np.reshape(image, (3, 64, 128))
+   #
+   #  # image = np.resize(image, (1, 64, 128))
+   #
+   #  io.show()
+   #  #OCRDataset("E:/project/OCR/data/train/")
+   #  # for i, data in enumerate(mx.gluon.data.DataLoader(TestSet(), batch_size=2)):
+   #  #     print(data)
+   # #to_ctc_format("0001011",20)
+   #

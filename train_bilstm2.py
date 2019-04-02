@@ -32,7 +32,7 @@ random_y_scaling, random_x_scaling = 0.1, 0.1
 random_shearing = 0.7
 ctx = mx.gpu() if mx.context.num_gpus() > 0 else mx.cpu()
 
-epochs = 130
+epochs = 10
 learning_rate = 0.001
 batch_size = 3
 
@@ -173,15 +173,37 @@ def run_epoch(e, network, dataloader, trainer, log_dir, print_name, is_train):
 
     return epoch_loss
 
+
+def extract_feature():
+    from mxboard import SummaryWriter
+    sw = SummaryWriter(logdir='./logs')
+    inputs = mx.sym.var('data')
+    out = net(inputs)
+    internals = out.get_internals()
+    print(internals.list_outputs()[-10:])
+    outputs = [internals['cnnattentionbilstm0_softmax0_output']]
+    feat_model = gluon.SymbolBlock(outputs, inputs, params=net.collect_params())
+    x = mx.nd.random.normal(shape=(16, 3, 224, 224))
+    image1, actual_label = test_ds[0]
+    image, _ = transform(image1, actual_label)
+    image = nd.array(image)
+    image = image.as_in_context(ctx)
+    image = image.expand_dims(axis=0)
+    # print(feat_model(image))
+    sw.add_image(tag='cnnattentionbilstm0_softmax0_output', image=feat_model(image))
+    # sw.add_image(tag='img', image=image1)
+    sw.close()
+
+
 if __name__ == '__main__':
     log_dir = "E:/project/OCR/logs/handwriting_recognition"
     checkpoint_dir = "E:/project/OCR/model_checkpoint"
-    checkpoint_name = "handwriting2.params"
-    train_path = "E:/project/OCR/data/d/"
-    test_path = "E:/project/OCR/data/d/"
+    checkpoint_name = "handwriting_train.params"
+    train_path = "E:/project/OCR/data/train/"
+    test_path = "E:/project/OCR/data/train/"
     ###
-    train_ds = OCRDataset(train_path)
-    print("Number of training samples: {}".format(len(train_ds)))
+    # train_ds = OCRDataset(train_path)
+    # print("Number of training samples: {}".format(len(train_ds)))
 
     test_ds = OCRDataset(train_path)
     print("Number of testing samples: {}".format(len(test_ds)))
@@ -195,50 +217,29 @@ if __name__ == '__main__':
                     rnn_hidden_states=lstm_hidden_states, rnn_layers=lstm_layers, max_seq_len=max_seq_len, ctx=ctx)
 
     net.load_parameters(os.path.join(checkpoint_dir,checkpoint_name))
-    from mxboard import SummaryWriter
-    sw = SummaryWriter(logdir='./logs')
-    inputs = mx.sym.var('data')
-    out = net(inputs)
-    internals =out.get_internals()
-    print(internals .list_outputs()[-10:])
-    outputs = [internals['cnnattentionbilstm0_softmax0_output']]
-    feat_model = gluon.SymbolBlock(outputs, inputs, params=net.collect_params())
-
-    #x = mx.nd.random.normal(shape=(16, 3, 224, 224))
-    image1, actual_label = test_ds[0]
-
-    image, _ = transform(image1, actual_label)
-
-    image = nd.array(image)
-    image = image.as_in_context(ctx)
-    image = image.expand_dims(axis=0)
-    # print(feat_model(image))
-    sw.add_image(tag='cnnattentionbilstm0_softmax0_output', image=feat_model(image))
-    # sw.add_image(tag='img', image=image1)
-    sw.close()
-
+    # extract_feature()
 
     # outputs = [internals['model_stage1_activation1_output']]
     # feat_model = gluon.SymbolBlock(outputs, inputs, params=resnet18.collect_params())
     length = len(test_ds)
     ac = 0
-    # for n in range(length):
-    #     # x = x.as_in_context(ctx)
-    #     # y = y.as_in_context(ctx)
-    #     n = int(random.random() * len(test_ds))
-    #     image, actual_label = test_ds[n]
-    #
-    #     image, _ = transform(image, actual_label)
-    #
-    #     image = nd.array(image)
-    #     image = image.as_in_context(ctx)
-    #     image = image.expand_dims(axis=0)
-    #     output = net(image)
-    #     predictions = output.softmax().topk(axis=2).asnumpy()
-    #     decoded_text = decode(predictions)
-    #     if str(decoded_text[0]) == (actual_label):
-    #         ac = ac +1
-    #     print("result ",decoded_text,actual_label)
-    # print("acc : ",ac/len(test_ds))
-    # #net.initialize(init=mx.init.Xavier(), force_reinit=True)
-    #
+    for n in range(length):
+        # x = x.as_in_context(ctx)
+        # y = y.as_in_context(ctx)
+        n = int(random.random() * len(test_ds))
+        image, actual_label = test_ds[n]
+
+        image, _ = transform(image, actual_label)
+
+        image = nd.array(image)
+        image = image.as_in_context(ctx)
+        image = image.expand_dims(axis=0)
+        output = net(image)
+        predictions = output.softmax().topk(axis=2).asnumpy()
+        decoded_text = decode(predictions)
+        if str(decoded_text[0]) == (actual_label):
+            ac = ac +1
+        print("result ",decoded_text,actual_label)
+    print("acc : ",ac/len(test_ds))
+    #net.initialize(init=mx.init.Xavier(), force_reinit=True)
+

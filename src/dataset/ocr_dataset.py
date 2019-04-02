@@ -16,6 +16,7 @@ class OCRDataset(data.Dataset):
                 image = io.imread(image_path)
                 image = resize(image, (64, 128),
                        anti_aliasing=True)
+                image = cv2.normalize(image,None,alpha=0,beta=1,norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
                 #image = mx.image.imread(image_path)
                 label = file.split("=")[-1].replace(".jpg", "")
                 self.data.append(image)
