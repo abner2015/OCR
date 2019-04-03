@@ -7,4 +7,8 @@ The project include 4 parts:
 - [x] 3.cnn-seq2seq ocr
 - [x] 4.cnn-seq2seq attention ocr
 
- [回到顶部](#readme)
+Reference:
+
+1.[https://github.com/awslabs/handwritten-text-recognition-for-apache-mxnet](https://github.com/awslabs/handwritten-text-recognition-for-apache-mxnet)
+
+[回到顶部](#readme)
