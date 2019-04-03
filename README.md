@@ -20,7 +20,7 @@ Reference:
 ===
 1.[https://github.com/awslabs/handwritten-text-recognition-for-apache-mxnet](https://github.com/awslabs/handwritten-text-recognition-for-apache-mxnet)
 
-![](https://github.com/guodongxiaren/ImageCache/raw/master/Logo/foryou.gif)
+![](https://github.com/abner2015/OCR/blob/dev/image/54362007-26700580-46a3-11e9-8648-9e1ef6445f54.png)
 
 [回到顶部](#readme)
  
